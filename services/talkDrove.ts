@@ -1,15 +1,47 @@
 
-import { API_BASE_URL, API_HEADERS } from '../constants';
+import { API_BASE_URL, API_HEADERS, REAL_API_URL } from '../constants';
 import { TalkDroveNumber, TalkDroveOTP } from '../types';
 
-// Helper to determine if we need to use a proxy
-const PROXY_PREFIX = 'https://api.allorigins.win/raw?url=';
-
-// Simple fetch wrapper to handle errors with retry logic
-const apiRequest = async <T>(endpoint: string, options: RequestInit = {}, useProxyRetry = true): Promise<T> => {
-  const directUrl = `${API_BASE_URL}${endpoint}`;
+/**
+ * ROBUST FETCH STRATEGY
+ * 1. Try Vercel Proxy (/api/proxy) - Best for Production
+ * 2. Try CORSProxy.io - Fast backup for Localhost
+ * 3. Try AllOrigins - Slow backup
+ */
+const apiRequest = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   
-  const performFetch = async (url: string) => {
+  // 1. Primary Attempt: Vercel Proxy
+  // This uses the relative path defined in constants.ts (/api/proxy)
+  const primaryUrl = `${API_BASE_URL}${endpoint}`;
+  
+  try {
+    return await performRequest<T>(primaryUrl, options);
+  } catch (primaryError: any) {
+    console.debug(`[TalkDrove] Primary proxy failed (${primaryError.message}). Attempting fallbacks...`);
+
+    // Construct the absolute target URL for the external proxies
+    const targetUrl = `${REAL_API_URL}${endpoint}`;
+
+    // 2. Secondary Attempt: corsproxy.io (Faster/More reliable than allorigins)
+    try {
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        return await performRequest<T>(proxyUrl, options);
+    } catch (secondaryError) {
+        
+        // 3. Tertiary Attempt: allorigins.win
+        try {
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+            return await performRequest<T>(proxyUrl, options);
+        } catch (finalError) {
+            console.error("[TalkDrove] All fetch attempts failed.");
+            throw primaryError; // Throw the original error as it's usually the most relevant
+        }
+    }
+  }
+};
+
+// Helper function to execute the fetch and parse JSON
+const performRequest = async <T>(url: string, options: RequestInit): Promise<T> => {
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -19,56 +51,19 @@ const apiRequest = async <T>(endpoint: string, options: RequestInit = {}, usePro
     });
 
     if (!response.ok) {
-        // Handle 404 specifically
+        // Handle 404 explicitly so we can trigger specific fallbacks
         if (response.status === 404) throw new Error("404_NOT_FOUND");
-        throw new Error(`API Error: ${response.status}`);
+        throw new Error(`HTTP_${response.status}`);
     }
 
-    // Parse JSON
     const text = await response.text();
+    if (!text) return {} as T;
+
     try {
         return JSON.parse(text);
     } catch {
-        // Sometimes APIs return plain text or empty responses
-        if (!text) return {} as T;
-        throw new Error("Invalid JSON response");
+        throw new Error("INVALID_JSON");
     }
-  };
-
-  try {
-    return await performFetch(directUrl);
-  } catch (error: any) {
-    // If we shouldn't retry, or if it's a specific auth error, throw immediately
-    if (!useProxyRetry || error.message.includes('401')) {
-        throw error;
-    }
-
-    // Check for conditions to retry with proxy:
-    // 1. Network Error (CORS)
-    // 2. 404 Not Found (Means local proxy route is missing, so we try direct via external proxy)
-    const isNetworkError = error.name === 'TypeError' || error.message === 'Failed to fetch';
-    const is404 = error.message === '404_NOT_FOUND';
-
-    if (isNetworkError || is404) {
-        console.debug(`[TalkDrove] Direct access failed (${error.message}). Retrying via CORS proxy...`);
-        try {
-            // Encode the full target URL
-            // Note: When using allorigins, we pass the full TalkDrove URL
-            // We reconstruct the full URL assuming API_BASE_URL might be relative or absolute.
-            // If API_BASE_URL is relative (e.g. /api/proxy), we can't use external proxy easily.
-            // So we default to the hardcoded TalkDrove URL for the proxy attempt.
-            const targetUrl = `https://numbers.talkdrove.com/api/v1/developer${endpoint}`;
-            const proxyUrl = `${PROXY_PREFIX}${encodeURIComponent(targetUrl)}`;
-            
-            return await performFetch(proxyUrl);
-        } catch (proxyError) {
-            console.error("Proxy retry also failed", proxyError);
-            throw error; // Throw the original error or the proxy error
-        }
-    }
-
-    throw error;
-  }
 };
 
 /**
@@ -90,14 +85,13 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
     if (Array.isArray(response?.data)) return response.data;
     if (Array.isArray(response?.numbers)) return response.numbers;
     
-    // If we got here but no array, try fallback
     throw new Error("Invalid format");
 
   } catch (e) {
-    // FALLBACK: If /numbers fails, fetch latest OTPs to find active numbers
-    // This is useful if the /numbers endpoint is restricted or broken
+    // FALLBACK STRATEGY: Scrape from OTPs
+    // If the /numbers endpoint is broken/restricted (404), we derive numbers from the latest messages.
     try {
-        console.warn("Fetching numbers failed, falling back to active OTP list.");
+        console.warn("[TalkDrove] /numbers endpoint failed. Deriving numbers from OTP list...");
         const otpData: any = await apiRequest('/otps/latest?limit=100');
         
         let otps: any[] = [];
@@ -122,7 +116,7 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
 
         return Array.from(uniqueNumbers.values());
     } catch (fallbackError) {
-        console.error("Fallback failed", fallbackError);
+        console.error("Fallback strategy failed", fallbackError);
         return [];
     }
   }
@@ -156,16 +150,10 @@ export const getOTPsByPhone = async (phone: string): Promise<TalkDroveOTP[]> => 
   }
 };
 
-/**
- * Get Health
- */
 export const getHealth = async (): Promise<any> => {
     return await apiRequest('/health');
 }
 
-/**
- * Get Stats
- */
 export const getStats = async (): Promise<any> => {
     return await apiRequest('/stats');
 }
