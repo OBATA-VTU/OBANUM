@@ -1,0 +1,5 @@
+{
+  "name": "Obanum",
+  "description": "A web application to generate temporary phone numbers for SMS verification.",
+  "requestFramePermissions": []
+}
