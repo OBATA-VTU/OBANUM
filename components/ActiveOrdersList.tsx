@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { TalkDroveNumber, TalkDroveOTP } from '../types';
 import { getOTPsByPhone } from '../services/talkDrove';
-import { RefreshCw, Copy, MessageSquare, Clock, Smartphone, Inbox, ChevronRight } from 'lucide-react';
+import { RefreshCw, Copy, Smartphone, Shield, Clock, Check, MessageSquare, AlertCircle, Radio } from 'lucide-react';
+import { getFlagUrl } from '../utils/countries';
 import toast from 'react-hot-toast';
 
 interface ActiveOrdersListProps {
@@ -11,17 +12,17 @@ interface ActiveOrdersListProps {
 export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ selectedNumber }) => {
     const [messages, setMessages] = useState<TalkDroveOTP[]>([]);
     const [loading, setLoading] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
+    // Fetch messages
     const fetchMessages = async (showLoading = false) => {
         if (!selectedNumber) return;
         if (showLoading) setLoading(true);
         
         try {
             const data = await getOTPsByPhone(selectedNumber.phone_number);
-            setMessages(data);
-            setLastUpdated(new Date());
+            setMessages(data); 
         } catch (error) {
             // Silently fail during polling
         } finally {
@@ -29,19 +30,19 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ selectedNumb
         }
     };
 
-    // Effect to handle number selection change
+    // Initial Load & Polling
     useEffect(() => {
-        setMessages([]); // Clear previous messages
+        setMessages([]); 
+        
         if (selectedNumber) {
             fetchMessages(true);
             
-            // Start polling
             if (intervalRef.current) clearInterval(intervalRef.current);
             intervalRef.current = setInterval(() => {
                 fetchMessages(false);
-            }, 5000); // Poll every 5 seconds
+            }, 4000); 
         }
-
+        
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
@@ -49,109 +50,140 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ selectedNumb
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
-        toast.success("Copied to clipboard");
+        toast.success("Code copied!");
     };
 
-    if (!selectedNumber) {
-        return (
-            <div className="bg-white rounded-2xl shadow-lg border border-slate-100 h-[600px] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-50 to-white z-0"></div>
-                <div className="relative z-10">
-                    <div className="bg-white p-6 rounded-full shadow-md mb-6 inline-block animate-float">
-                        <Smartphone className="h-10 w-10 text-indigo-400" />
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-2">No Number Selected</h3>
-                    <p className="text-slate-500 max-w-xs mx-auto">Click on any number from the list to view its real-time SMS inbox.</p>
-                </div>
-            </div>
-        );
-    }
+    if (!selectedNumber) return null;
 
     return (
-        <div className="bg-white rounded-2xl shadow-xl border border-indigo-100 h-[600px] flex flex-col overflow-hidden relative">
-            {/* Header */}
-            <div className="p-5 border-b border-indigo-50 bg-gradient-to-r from-indigo-50 to-white z-10">
-                <div className="flex justify-between items-start mb-2">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                            <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Live Inbox</span>
-                        </div>
-                        <h2 className="text-2xl font-mono font-bold text-slate-900 tracking-tight">{selectedNumber.phone_number}</h2>
-                    </div>
-                    <button 
-                        onClick={() => copyToClipboard(selectedNumber.phone_number)}
-                        className="p-2.5 bg-white hover:bg-indigo-50 rounded-xl transition-all border border-slate-200 hover:border-indigo-200 shadow-sm text-slate-500 hover:text-indigo-600"
-                        title="Copy Number"
-                    >
-                        <Copy className="h-5 w-5" />
-                    </button>
-                </div>
-                <div className="flex items-center justify-between text-xs text-slate-400 mt-3">
-                    <span className="flex items-center gap-1">
-                        <RefreshCw className="w-3 h-3 animate-spin" />
-                        Auto-updating
-                    </span>
-                    {lastUpdated && (
-                        <span>Last check: {lastUpdated.toLocaleTimeString()}</span>
-                    )}
-                </div>
-            </div>
-
-            {/* Message List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 scroll-smooth">
-                {loading && messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
-                        <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
-                        <span className="text-sm font-medium">Fetching messages...</span>
-                    </div>
-                ) : messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                            <Inbox className="h-8 w-8 text-slate-300" />
-                        </div>
-                        <h4 className="text-slate-900 font-medium mb-1">Inbox is empty</h4>
-                        <p className="text-xs text-slate-500 max-w-[200px]">Send an SMS to this number and it will appear here instantly.</p>
-                    </div>
-                ) : (
-                    messages.map((msg, idx) => (
-                        <div key={idx} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all animate-fade-in-up hover:border-indigo-200 group">
-                            <div className="flex justify-between items-center mb-3">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-gradient-to-r from-indigo-500 to-violet-500 text-white capitalize shadow-sm">
-                                    {msg.platform !== 'Unknown' ? msg.platform : 'New Message'}
-                                </span>
-                                <div className="flex items-center text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded-full">
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                            </div>
-                            
-                            {msg.otp_code && (
-                                <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-3 font-mono text-center text-2xl font-bold tracking-[0.2em] text-indigo-600 group-hover:scale-105 transition-transform">
-                                    {msg.otp_code}
-                                </div>
-                            )}
-                            
-                            <div className="flex gap-3">
-                                <div className="w-1 bg-slate-200 rounded-full group-hover:bg-indigo-400 transition-colors"></div>
-                                <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                                    {msg.message || msg.sms_text}
-                                </p>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
+        <div className="bg-slate-900 rounded-3xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col h-[700px] w-full relative">
             
-            {/* Refresh Button (Manual) */}
-            <div className="p-4 border-t border-slate-200 bg-white z-10">
+            {/* Dark Mode Header */}
+            <div className="bg-slate-800 border-b border-slate-700 p-6 flex items-center justify-between z-10 shadow-lg shrink-0">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-slate-700 flex items-center justify-center overflow-hidden border border-slate-600">
+                        <img 
+                            src={getFlagUrl(selectedNumber.country)} 
+                            alt={selectedNumber.country} 
+                            className="w-full h-full object-cover opacity-80"
+                        />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-3">
+                             <h2 className="font-mono font-bold text-2xl text-white tracking-wider shadow-black drop-shadow-md">
+                                {selectedNumber.phone_number}
+                            </h2>
+                            <button 
+                                onClick={() => copyToClipboard(selectedNumber.phone_number)}
+                                className="text-slate-400 hover:text-white transition-colors bg-slate-700 p-1.5 rounded-lg"
+                                title="Copy Number"
+                            >
+                                <Copy className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm mt-1">
+                            <span className="text-slate-400 font-medium">{selectedNumber.country}</span>
+                            <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                <span className="text-green-400 text-xs font-bold uppercase tracking-wider">Live Connection</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <button 
                     onClick={() => fetchMessages(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-900 text-white hover:bg-indigo-600 transition-all shadow-lg hover:shadow-indigo-200 text-sm font-bold active:scale-[0.98]"
+                    className="p-3 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-xl transition-all border border-slate-600 group shadow-lg"
+                    title="Refresh Messages"
                 >
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    Check for new messages
+                    <RefreshCw className={`w-5 h-5 group-hover:rotate-180 transition-transform duration-500 ${loading ? 'animate-spin' : ''}`} />
                 </button>
+            </div>
+
+            {/* Messages Feed */}
+            <div 
+                ref={containerRef}
+                className="flex-1 bg-slate-900 overflow-y-auto p-4 sm:p-6 space-y-4 relative scroll-smooth"
+            >
+                {loading && messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-4">
+                         <div className="relative">
+                            <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 rounded-full animate-pulse"></div>
+                            <Radio className="w-16 h-16 text-indigo-500 animate-pulse relative z-10" />
+                         </div>
+                        <span className="text-sm font-mono tracking-widest uppercase">Establishing Secure Link...</span>
+                    </div>
+                ) : messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full py-10">
+                        <div className="w-32 h-32 rounded-full border border-slate-700 flex items-center justify-center mb-8 relative">
+                             <div className="absolute w-full h-full border-2 border-indigo-500/30 rounded-full animate-ping"></div>
+                             <div className="w-24 h-24 rounded-full bg-slate-800 flex items-center justify-center z-10">
+                                 <Radio className="w-10 h-10 text-indigo-400" />
+                             </div>
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">Waiting for Signal</h3>
+                        <p className="text-slate-400 text-center max-w-sm leading-relaxed text-sm">
+                            System is monitoring for incoming SMS packets.<br/>
+                            <span className="text-indigo-400">Send your code now.</span>
+                        </p>
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {messages.map((msg, idx) => (
+                            <div key={idx} className="bg-slate-800 rounded-2xl border border-slate-700 p-6 hover:border-slate-600 transition-colors animate-fade-in-up shadow-xl relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                                
+                                <div className="flex flex-col sm:flex-row gap-6 justify-between items-start">
+                                    <div className="flex-1 space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <span className="bg-slate-700 text-white px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider border border-slate-600">
+                                                {msg.platform !== 'Unknown' && msg.platform !== 'Service' ? msg.platform : 'Incoming SMS'}
+                                            </span>
+                                            <span className="text-xs text-slate-500 flex items-center gap-1 font-mono">
+                                                <Clock className="w-3 h-3" />
+                                                {new Date(msg.created_at).toLocaleTimeString()}
+                                            </span>
+                                        </div>
+                                        
+                                        <p className="text-slate-300 text-sm leading-relaxed font-mono">
+                                            {msg.message || msg.sms_text}
+                                        </p>
+                                    </div>
+
+                                    {/* Prominent OTP Box */}
+                                    {msg.otp_code && (
+                                        <div className="flex-shrink-0 w-full sm:w-auto">
+                                            <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 flex flex-col items-center gap-2 min-w-[140px] group-hover:border-indigo-500/50 transition-colors">
+                                                <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Verification Code</span>
+                                                <div className="text-4xl font-mono font-black text-white tracking-widest drop-shadow-lg">
+                                                    {msg.otp_code}
+                                                </div>
+                                                <button 
+                                                    onClick={() => copyToClipboard(msg.otp_code)}
+                                                    className="text-xs text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-wider flex items-center gap-1 mt-1"
+                                                >
+                                                    <Copy className="w-3 h-3" /> Copy Code
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Footer Status Bar */}
+            <div className="bg-slate-800 border-t border-slate-700 px-6 py-3 text-xs text-slate-400 flex justify-between items-center shrink-0 font-mono">
+                <span className="flex items-center gap-2">
+                    <Shield className="w-3 h-3" />
+                    Encrypted Connection
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                    Live Feed Active
+                </span>
             </div>
         </div>
     );
