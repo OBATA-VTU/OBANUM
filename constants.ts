@@ -1,6 +1,6 @@
 
 // API Configuration
-export const API_KEY = 'd2ae79d7c3d3d02411aadf637c345cb62ccdf344722c0bfdcbadec0f4ae12e1e';
+export const API_KEY = 'd82e1fdc1c6adbe2f93436c8bfbe1c6a6cec6dc2ab7dac54018b4d1aeb2970c0';
 
 // KEY FIX: Set this to the relative path '/api/proxy'.
 // This forces the request to go through the Vercel Rewrite rules defined in vercel.json.
