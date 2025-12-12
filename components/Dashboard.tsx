@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { getNumbers, getGlobalOTPs } from '../services/talkDrove';
-import { Smartphone, Globe, Activity, Radio, ArrowRight } from 'lucide-react';
+import { Smartphone, Globe, Activity, Radio, ChevronRight, Zap } from 'lucide-react';
 
 interface DashboardProps {
     onNavigate: (page: any) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const [stats, setStats] = useState({ numbers: 0, countries: 0, lastMsg: 'Scanning...' });
+  const [stats, setStats] = useState({ numbers: 0, countries: 0, lastMsg: 'Loading...' });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -17,87 +18,121 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             setStats({
                 numbers: nums.length,
                 countries: uniqueC,
-                lastMsg: msgs[0] ? `${new Date(msgs[0].created_at).toLocaleTimeString()} - ${msgs[0].platform}` : 'No recent activity'
+                lastMsg: msgs[0] ? `${new Date(msgs[0].created_at).toLocaleTimeString()}` : 'No recent activity'
             });
-        } catch (e) {}
+        } catch (e) {
+            // silent fallback
+        } finally {
+            setLoading(false);
+        }
     };
     load();
   }, []);
 
   return (
-    <div className="p-6 lg:p-10 min-h-screen bg-slate-50">
-       <div className="max-w-6xl mx-auto">
-            <h1 className="text-3xl font-black text-slate-900 mb-2">Welcome Back</h1>
-            <p className="text-slate-500 mb-10">Here is what is happening on the Obanum network today.</p>
+    <div className="min-h-screen bg-slate-50 p-4 lg:p-8 font-sans">
+       <div className="max-w-6xl mx-auto space-y-8">
+            
+            {/* Header */}
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+                <p className="text-slate-500 text-sm mt-1">Overview of available resources.</p>
+            </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <Smartphone className="w-32 h-32 text-indigo-600 transform -rotate-12" />
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Active Numbers */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-32">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="text-sm font-medium text-slate-500">Active Numbers</div>
+                            <div className="text-3xl font-bold text-slate-900 mt-1">
+                                {loading ? '...' : stats.numbers}
+                            </div>
+                        </div>
+                        <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
+                            <Smartphone className="w-5 h-5" />
+                        </div>
                     </div>
-                    <div className="text-sm font-bold text-indigo-500 uppercase tracking-widest mb-2">Active Lines</div>
-                    <div className="text-5xl font-black text-slate-900 mb-4">{stats.numbers || '...'}</div>
-                    <button onClick={() => onNavigate('numbers')} className="text-sm font-bold text-slate-900 flex items-center gap-1 hover:gap-2 transition-all">
-                        View All Numbers <ArrowRight className="w-4 h-4" />
-                    </button>
                 </div>
 
-                <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden group">
-                     <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <Globe className="w-32 h-32 text-purple-600 transform rotate-12" />
+                {/* Countries */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-32">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="text-sm font-medium text-slate-500">Countries Available</div>
+                            <div className="text-3xl font-bold text-slate-900 mt-1">
+                                {loading ? '...' : stats.countries}
+                            </div>
+                        </div>
+                        <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center text-purple-600">
+                            <Globe className="w-5 h-5" />
+                        </div>
                     </div>
-                    <div className="text-sm font-bold text-purple-500 uppercase tracking-widest mb-2">Countries</div>
-                    <div className="text-5xl font-black text-slate-900 mb-4">{stats.countries || '...'}</div>
-                    <div className="text-sm text-slate-400">Global Coverage</div>
                 </div>
 
-                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden text-white">
-                     <div className="absolute top-0 right-0 p-6 opacity-10">
-                        <Activity className="w-32 h-32 text-emerald-400" />
+                {/* Last Activity */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-32">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="text-sm font-medium text-slate-500">Last Message</div>
+                            <div className="text-xl font-bold text-slate-900 mt-1 truncate">
+                                {loading ? '...' : stats.lastMsg}
+                            </div>
+                        </div>
+                        <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600">
+                            <Radio className="w-5 h-5" />
+                        </div>
                     </div>
-                    <div className="text-sm font-bold text-emerald-400 uppercase tracking-widest mb-2">System Status</div>
-                    <div className="text-5xl font-black mb-4">99.9%</div>
-                    <div className="text-sm text-slate-400">Operational</div>
                 </div>
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white flex flex-col justify-between items-start shadow-2xl shadow-indigo-500/20">
-                    <div>
-                        <h3 className="text-2xl font-bold mb-2">Need a number now?</h3>
-                        <p className="text-indigo-100 mb-8 max-w-sm">Select from our list of free numbers to bypass verification instantly.</p>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                    <h2 className="text-lg font-bold text-slate-900 mb-4">Get a Number</h2>
+                    <p className="text-slate-500 mb-6">Browse our inventory of temporary phone numbers for SMS verification.</p>
                     <button 
                         onClick={() => onNavigate('numbers')}
-                        className="bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-colors shadow-lg"
+                        className="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                     >
-                        Pick a Number
+                        Browse Inventory <ChevronRight className="w-4 h-4 ml-2" />
                     </button>
                 </div>
 
-                <div className="bg-white rounded-3xl p-8 border border-slate-200 flex flex-col justify-between items-start">
-                    <div>
-                        <div className="flex items-center gap-3 mb-4">
-                            <span className="relative flex h-3 w-3">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
-                            </span>
-                            <h3 className="text-2xl font-bold text-slate-900">Live Traffic</h3>
-                        </div>
-                        <p className="text-slate-500 mb-8">
-                            Latest activity: <span className="font-mono text-slate-700 bg-slate-100 px-2 py-1 rounded">{stats.lastMsg}</span>
-                        </p>
-                    </div>
+                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                    <h2 className="text-lg font-bold text-slate-900 mb-4">Live Activity</h2>
+                    <p className="text-slate-500 mb-6">Monitor global SMS traffic and recently received verification codes.</p>
                     <button 
                         onClick={() => onNavigate('feed')}
-                        className="w-full bg-slate-50 text-slate-700 border border-slate-200 px-6 py-3 rounded-xl font-bold hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                        className="inline-flex items-center justify-center px-6 py-3 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
                     >
-                        Go to Global Feed
+                        View Feed <Activity className="w-4 h-4 ml-2" />
                     </button>
                 </div>
             </div>
+
+            {/* Service Status List */}
+            <div>
+                <h3 className="text-sm font-bold text-slate-900 mb-4">Platform Availability</h3>
+                <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
+                    {[
+                        { name: 'WhatsApp', status: 'Online' },
+                        { name: 'Telegram', status: 'Online' },
+                        { name: 'Google', status: 'Online' },
+                        { name: 'OpenAI', status: 'Online' },
+                    ].map((s, i) => (
+                        <div key={i} className="flex items-center justify-between p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                <span className="font-medium text-slate-700">{s.name}</span>
+                            </div>
+                            <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded">{s.status}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
        </div>
     </div>
   );

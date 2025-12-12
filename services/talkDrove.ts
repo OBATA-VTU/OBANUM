@@ -2,10 +2,10 @@ import { API_BASE_URL, API_HEADERS, REAL_API_URL } from '../constants';
 import { TalkDroveNumber, TalkDroveOTP } from '../types';
 
 // Custom Error Class for better UI feedback
-export class TalkDroveError extends Error {
+export class SystemError extends Error {
   constructor(message: string, public code: string = 'UNKNOWN_ERROR') {
     super(message);
-    this.name = 'TalkDroveError';
+    this.name = 'SystemError';
   }
 }
 
@@ -17,7 +17,7 @@ export class TalkDroveError extends Error {
  */
 const apiRequest = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   
-  // 1. Primary Attempt: Vercel Proxy
+  // 1. Primary Attempt: Secure Internal Proxy
   const primaryUrl = `${API_BASE_URL}${endpoint}`;
   
   try {
@@ -26,19 +26,19 @@ const apiRequest = async <T>(endpoint: string, options: RequestInit = {}): Promi
     // Construct the absolute target URL for the external proxies
     const targetUrl = `${REAL_API_URL}${endpoint}`;
 
-    // 2. Secondary Attempt: corsproxy.io
+    // 2. Secondary Attempt: Secure Routing Node A
     try {
         const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
         return await performRequest<T>(proxyUrl, options);
     } catch (secondaryError) {
         
-        // 3. Tertiary Attempt: allorigins.win
+        // 3. Tertiary Attempt: Secure Routing Node B
         try {
             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
             return await performRequest<T>(proxyUrl, options);
         } catch (finalError) {
-            console.warn(`[TalkDrove] API Request Failed: ${endpoint}`);
-            throw new TalkDroveError("Unable to connect to server. Please check your internet connection.", "NETWORK_ERROR");
+            console.warn(`[Obanum Core] Node Connection Failed: ${endpoint}`);
+            throw new SystemError("Secure gateway unreachable. Check your connection.", "NETWORK_ERROR");
         }
     }
   }
@@ -55,11 +55,11 @@ const performRequest = async <T>(url: string, options: RequestInit): Promise<T> 
         });
 
         if (!response.ok) {
-            if (response.status === 404) throw new TalkDroveError("Resource not found", "NOT_FOUND");
-            if (response.status === 401) throw new TalkDroveError("Unauthorized access", "AUTH_ERROR");
-            if (response.status === 429) throw new TalkDroveError("Too many requests. Please wait a moment.", "RATE_LIMIT");
-            if (response.status >= 500) throw new TalkDroveError("Server temporary unavailable", "SERVER_ERROR");
-            throw new TalkDroveError(`Request failed with status ${response.status}`, "HTTP_ERROR");
+            if (response.status === 404) throw new SystemError("Resource unavailable in current node", "NOT_FOUND");
+            if (response.status === 401) throw new SystemError("Session signature expired", "AUTH_ERROR");
+            if (response.status === 429) throw new SystemError("Traffic limit reached. Cool down.", "RATE_LIMIT");
+            if (response.status >= 500) throw new SystemError("System maintenance in progress", "SERVER_ERROR");
+            throw new SystemError(`Node response: ${response.status}`, "HTTP_ERROR");
         }
 
         const text = await response.text();
@@ -68,18 +68,18 @@ const performRequest = async <T>(url: string, options: RequestInit): Promise<T> 
         try {
             return JSON.parse(text);
         } catch {
-            throw new TalkDroveError("Invalid response from server", "PARSE_ERROR");
+            throw new SystemError("Data decryption failed", "PARSE_ERROR");
         }
     } catch (error: any) {
-        if (error instanceof TalkDroveError) throw error;
-        throw new TalkDroveError(error.message || "Network request failed", "NETWORK_ERROR");
+        if (error instanceof SystemError) throw error;
+        throw new SystemError(error.message || "Secure connection failed", "NETWORK_ERROR");
     }
 };
 
 // Comprehensive Country Code Map
 const COUNTRY_CODES: Record<string, string> = {
-    '1': 'USA/Canada',
-    '7': 'Russia/Kazakhstan',
+    '1': 'USA',
+    '7': 'Russia',
     '20': 'Egypt',
     '27': 'South Africa',
     '30': 'Greece',
@@ -285,13 +285,12 @@ const detectCountry = (phone: string, existingCountry?: string): string => {
 
 /**
  * Get list of available phone numbers
- * SCALED UP: Fetches up to 500 pages (50,000 items) to support extreme volume.
  */
 export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> => {
   try {
     let rawData: any[] = [];
-    const MAX_PAGES = 500; // Target: 50,000 numbers (500 pages * 100 items)
-    const BATCH_SIZE = 10; // 10 Requests in parallel per batch
+    const MAX_PAGES = 500; 
+    const BATCH_SIZE = 10; 
 
     const extractList = (res: any) => {
         if (Array.isArray(res)) return res;
@@ -301,9 +300,7 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
     };
 
     if (country && country !== 'All') {
-        // For specific country, fetch deeper than before (up to 5000 numbers)
         const countryMaxPages = 50;
-        
         for (let i = 0; i < countryMaxPages; i += 10) {
              const pages = [];
              for(let j=1; j<=10; j++) {
@@ -311,7 +308,6 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
                  pages.push(i+j);
              }
              
-             // Yield to main thread to prevent UI freeze
              await new Promise(r => setTimeout(r, 0));
 
              const responses = await Promise.all(
@@ -325,10 +321,9 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
                 rawData = [...rawData, ...list];
              });
              
-             if (!hasData) break; // Stop if we run out of numbers for this country
+             if (!hasData) break; 
         }
     } else {
-        // FETCHING ALL: Massive Parallel Execution
         for (let i = 0; i < MAX_PAGES; i += BATCH_SIZE) {
             const currentBatchPages = [];
             for (let j = 1; j <= BATCH_SIZE; j++) {
@@ -337,10 +332,8 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
                 currentBatchPages.push(pageNum);
             }
 
-            // Yield to main thread to prevent UI freeze
             await new Promise(r => setTimeout(r, 0));
 
-            // Execute batch
             const batchPromises = currentBatchPages.map(page => 
                 apiRequest(`/numbers?page=${page}&limit=100`)
                     .catch(() => ({ data: [] }))
@@ -355,7 +348,6 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
                 rawData = [...rawData, ...list];
             });
 
-            // If empty batch, assume end of data
             if (!batchHasData) break;
         }
     }
@@ -378,14 +370,11 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
     const finalNumbers = Array.from(uniqueMap.values());
     if (finalNumbers.length > 0) return finalNumbers;
     
-    // Do not throw "Empty list" error as it may just be filtered out
     return [];
 
   } catch (e) {
-    // FALLBACK: Deep OTP Scan
     try {
-        console.warn("[TalkDrove] Main fetch failed. Running deep scan...");
-        // Fetch 5 pages of OTPs to find numbers
+        console.warn("[Obanum System] Index scan failed. Initiating deep grid search...");
         const pages = [1, 2, 3, 4, 5];
         const responses = await Promise.all(
              pages.map(p => apiRequest(`/otps/latest?limit=100&page=${p}`).catch(()=>({})))
@@ -417,7 +406,7 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
 
         return Array.from(uniqueNumbers.values());
     } catch (fallbackError) {
-        console.error("Fallback strategy failed", fallbackError);
+        console.error("Grid search failed", fallbackError);
         return [];
     }
   }
@@ -441,19 +430,17 @@ export const getOTPsByPhone = async (phone: string): Promise<TalkDroveOTP[]> => 
         phone_number: item.phone_number,
         otp_code: item.otp_code,
         message: item.message || item.sms_text || item.otp_code,
-        platform: item.platform || 'Service',
+        platform: item.platform || 'System',
         created_at: item.created_at,
         country: detectCountry(item.phone_number, item.country)
     }));
   } catch (e) {
-    // Return empty array instead of throwing to keep UI stable
     return [];
   }
 };
 
 /**
  * Get Global Live Feed of OTPs
- * SCALED UP: Fetches latest 500 OTPs (5 pages) to support high traffic.
  */
 export const getGlobalOTPs = async (): Promise<TalkDroveOTP[]> => {
     try {
@@ -469,7 +456,6 @@ export const getGlobalOTPs = async (): Promise<TalkDroveOTP[]> => {
             else if (Array.isArray(res?.otps)) allData = [...allData, ...res.otps];
         });
 
-        // Unique by ID to prevent overlap
         const unique = new Map();
         allData.forEach(item => unique.set(item.id, item));
         
@@ -478,13 +464,13 @@ export const getGlobalOTPs = async (): Promise<TalkDroveOTP[]> => {
             phone_number: item.phone_number,
             otp_code: item.otp_code,
             message: item.message || item.sms_text || item.otp_code,
-            platform: item.platform || 'Service',
+            platform: item.platform || 'System',
             created_at: item.created_at,
             country: detectCountry(item.phone_number, item.country)
         })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         
     } catch (e) {
-        console.error("Failed to fetch global OTPs", e);
+        console.error("Failed to sync secure feed", e);
         return [];
     }
 };

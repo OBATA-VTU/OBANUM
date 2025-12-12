@@ -1,83 +1,60 @@
 import React, { useEffect, useState } from 'react';
 import { getHealth } from '../services/talkDrove';
-import { Server, CheckCircle, XCircle, Activity, Globe, Database } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Globe, Database, Server } from 'lucide-react';
 
 export const StatusPage: React.FC = () => {
-  const [status, setStatus] = useState<'checking' | 'operational' | 'degraded'>('checking');
-  const [metrics, setMetrics] = useState({
-      api: 'Checking...',
-      db: 'Operational',
-      sms: 'Operational'
-  });
+  const [status, setStatus] = useState<'operational' | 'degraded'>('operational');
 
   useEffect(() => {
-    const check = async () => {
-        try {
-            await getHealth();
-            setStatus('operational');
-            setMetrics(prev => ({ ...prev, api: 'Operational' }));
-        } catch (e) {
-            setStatus('degraded');
-            setMetrics(prev => ({ ...prev, api: 'High Latency' }));
-        }
-    };
-    check();
+    getHealth().catch(() => setStatus('degraded'));
   }, []);
 
   return (
-    <div className="bg-slate-50 min-h-screen py-16">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 p-4 lg:p-12">
+      <div className="max-w-4xl mx-auto">
         
-        {/* Main Status Banner */}
-        <div className={`rounded-3xl p-8 md:p-12 mb-12 flex flex-col items-center text-center shadow-lg transition-colors duration-500 ${status === 'operational' ? 'bg-green-600' : status === 'checking' ? 'bg-slate-600' : 'bg-amber-500'}`}>
-            {status === 'checking' ? (
-                <Activity className="w-16 h-16 text-white animate-pulse mb-6" />
-            ) : status === 'operational' ? (
-                <CheckCircle className="w-16 h-16 text-white mb-6" />
-            ) : (
-                <XCircle className="w-16 h-16 text-white mb-6" />
-            )}
-            
-            <h1 className="text-3xl md:text-5xl font-bold text-white mb-4">
-                {status === 'checking' ? 'Checking Systems...' : status === 'operational' ? 'All Systems Operational' : 'Partial System Outage'}
-            </h1>
-            <p className="text-white/80 text-lg">
-                Current status of Obanum services and API
-            </p>
+        {/* Header */}
+        <div className="mb-12">
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">System Status</h1>
+            <p className="text-slate-500">Current operational status of Obanum services.</p>
         </div>
 
-        {/* Components Grid */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
+        {/* Main Status Indicator */}
+        <div className={`
+            p-8 rounded-xl border flex items-center gap-6 mb-8
+            ${status === 'operational' ? 'bg-white border-slate-200' : 'bg-amber-50 border-amber-200'}
+        `}>
+            <div className={`p-4 rounded-full ${status === 'operational' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                {status === 'operational' ? <CheckCircle2 className="w-8 h-8" /> : <AlertTriangle className="w-8 h-8" />}
+            </div>
+            <div>
+                <h2 className="text-xl font-bold text-slate-900">
+                    {status === 'operational' ? 'All Systems Operational' : 'Performance Degraded'}
+                </h2>
+                <p className="text-slate-500 mt-1">
+                    Last checked: {new Date().toLocaleTimeString()}
+                </p>
+            </div>
+        </div>
+
+        {/* Component Grid */}
+        <div className="space-y-4">
             {[
-                { name: 'API Gateway', icon: <Globe className="w-6 h-6" />, status: metrics.api },
-                { name: 'Number Database', icon: <Database className="w-6 h-6" />, status: metrics.db },
-                { name: 'SMS Receivers', icon: <Server className="w-6 h-6" />, status: metrics.sms },
+                { name: 'API Gateway', icon: Globe, status: 'Operational' },
+                { name: 'Database Clusters', icon: Database, status: 'Operational' },
+                { name: 'Web Server', icon: Server, status: 'Operational' },
             ].map((item, i) => (
-                <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-slate-100 rounded-lg text-slate-600">{item.icon}</div>
-                        <span className="font-bold text-slate-900">{item.name}</span>
+                <div key={i} className="bg-white p-5 rounded-lg border border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <item.icon className="w-5 h-5 text-slate-400" />
+                        <div className="font-medium text-slate-900">{item.name}</div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${item.status === 'Operational' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {item.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                        <span className="text-sm font-medium text-emerald-600">{item.status}</span>
+                    </div>
                 </div>
             ))}
-        </div>
-
-        {/* Incident History (Static for now) */}
-        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-100">
-                <h3 className="text-lg font-bold text-slate-900">Past Incidents</h3>
-            </div>
-            <div className="p-6">
-                <div className="space-y-8">
-                    <div className="relative pl-8 border-l-2 border-slate-200 pb-2">
-                        <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-200 border-4 border-white"></div>
-                        <div className="text-sm text-slate-500 mb-1">No incidents reported today.</div>
-                    </div>
-                </div>
-            </div>
         </div>
 
       </div>

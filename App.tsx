@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar, PageType } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
+import { BottomNav } from './components/BottomNav';
 import { Hero } from './components/Hero';
 import { Dashboard } from './components/Dashboard';
 import { NumbersPage } from './components/NumbersPage';
@@ -30,17 +31,25 @@ function App() {
   };
 
   // Determine Layout
-  const isAppLayout = ['dashboard', 'numbers', 'feed'].includes(currentPage);
+  // Added 'status' here so it uses the App Layout (Sidebar/BottomNav) instead of Website Layout
+  const isAppLayout = ['dashboard', 'numbers', 'feed', 'status'].includes(currentPage);
 
   if (isAppLayout) {
       return (
         <div className="min-h-screen bg-slate-50 flex font-sans">
             <Toaster position="top-right" />
+            
+            {/* Desktop Sidebar */}
             <Sidebar currentPage={currentPage} onNavigate={navigate} />
-            <main className="flex-1 lg:ml-72 pt-20 lg:pt-0 transition-all duration-300">
+            
+            {/* Mobile Bottom Navigation */}
+            <BottomNav currentPage={currentPage} onNavigate={navigate} />
+
+            <main className="flex-1 lg:ml-72 pb-24 lg:pb-0 transition-all duration-300">
                 {currentPage === 'dashboard' && <Dashboard onNavigate={navigate} />}
                 {currentPage === 'numbers' && <NumbersPage onNavigate={navigate} />}
                 {currentPage === 'feed' && <LiveFeed />}
+                {currentPage === 'status' && <StatusPage />}
             </main>
         </div>
       );
@@ -57,7 +66,6 @@ function App() {
         {currentPage === 'privacy' && <PrivacyPolicy />}
         {currentPage === 'terms' && <TermsOfService />}
         {currentPage === 'contact' && <Contact />}
-        {currentPage === 'status' && <StatusPage />}
       </main>
       
       <footer className="bg-white border-t border-slate-200 py-12">
