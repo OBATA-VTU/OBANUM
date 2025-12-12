@@ -37,7 +37,7 @@ function App() {
         <div className="min-h-screen bg-slate-50 flex font-sans">
             <Toaster position="top-right" />
             <Sidebar currentPage={currentPage} onNavigate={navigate} />
-            <main className="flex-1 lg:ml-72 transition-all duration-300">
+            <main className="flex-1 lg:ml-72 pt-20 lg:pt-0 transition-all duration-300">
                 {currentPage === 'dashboard' && <Dashboard onNavigate={navigate} />}
                 {currentPage === 'numbers' && <NumbersPage onNavigate={navigate} />}
                 {currentPage === 'feed' && <LiveFeed />}

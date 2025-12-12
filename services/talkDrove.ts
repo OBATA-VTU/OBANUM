@@ -1,6 +1,13 @@
-
 import { API_BASE_URL, API_HEADERS, REAL_API_URL } from '../constants';
 import { TalkDroveNumber, TalkDroveOTP } from '../types';
+
+// Custom Error Class for better UI feedback
+export class TalkDroveError extends Error {
+  constructor(message: string, public code: string = 'UNKNOWN_ERROR') {
+    super(message);
+    this.name = 'TalkDroveError';
+  }
+}
 
 /**
  * ROBUST FETCH STRATEGY
@@ -16,8 +23,6 @@ const apiRequest = async <T>(endpoint: string, options: RequestInit = {}): Promi
   try {
     return await performRequest<T>(primaryUrl, options);
   } catch (primaryError: any) {
-    console.debug(`[TalkDrove] Primary proxy failed (${primaryError.message}). Attempting fallbacks...`);
-
     // Construct the absolute target URL for the external proxies
     const targetUrl = `${REAL_API_URL}${endpoint}`;
 
@@ -32,39 +37,46 @@ const apiRequest = async <T>(endpoint: string, options: RequestInit = {}): Promi
             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
             return await performRequest<T>(proxyUrl, options);
         } catch (finalError) {
-            console.error("[TalkDrove] All fetch attempts failed.");
-            throw primaryError; 
+            console.warn(`[TalkDrove] API Request Failed: ${endpoint}`);
+            throw new TalkDroveError("Unable to connect to server. Please check your internet connection.", "NETWORK_ERROR");
         }
     }
   }
 };
 
 const performRequest = async <T>(url: string, options: RequestInit): Promise<T> => {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...API_HEADERS,
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-        if (response.status === 404) throw new Error("404_NOT_FOUND");
-        throw new Error(`HTTP_${response.status}`);
-    }
-
-    const text = await response.text();
-    if (!text) return {} as T;
-
     try {
-        return JSON.parse(text);
-    } catch {
-        throw new Error("INVALID_JSON");
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            ...API_HEADERS,
+            ...options.headers,
+          },
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) throw new TalkDroveError("Resource not found", "NOT_FOUND");
+            if (response.status === 401) throw new TalkDroveError("Unauthorized access", "AUTH_ERROR");
+            if (response.status === 429) throw new TalkDroveError("Too many requests. Please wait a moment.", "RATE_LIMIT");
+            if (response.status >= 500) throw new TalkDroveError("Server temporary unavailable", "SERVER_ERROR");
+            throw new TalkDroveError(`Request failed with status ${response.status}`, "HTTP_ERROR");
+        }
+
+        const text = await response.text();
+        if (!text) return {} as T;
+
+        try {
+            return JSON.parse(text);
+        } catch {
+            throw new TalkDroveError("Invalid response from server", "PARSE_ERROR");
+        }
+    } catch (error: any) {
+        if (error instanceof TalkDroveError) throw error;
+        throw new TalkDroveError(error.message || "Network request failed", "NETWORK_ERROR");
     }
 };
 
 // Comprehensive Country Code Map
-// Ordered roughly by specificity (longer codes first) to prevent partial matches
 const COUNTRY_CODES: Record<string, string> = {
     '1': 'USA/Canada',
     '7': 'Russia/Kazakhstan',
@@ -256,20 +268,11 @@ const COUNTRY_CODES: Record<string, string> = {
 
 // Robust Country Detection
 const detectCountry = (phone: string, existingCountry?: string): string => {
-    // If API provided a valid country, use it
     if (existingCountry && existingCountry !== 'Unknown' && existingCountry !== 'International' && existingCountry.length > 2) {
         return existingCountry;
     }
-    
-    // Clean number (remove spaces, dashes)
     const p = phone.trim().replace(/[\s-]/g, '');
-    
-    // We expect format +123... if not present, assume it needs a +
     const cleanPhone = p.startsWith('+') ? p.substring(1) : p;
-
-    // Check against map
-    // We sort keys by length descending so we match '992' before '9' (if '9' existed)
-    // This is less critical with the static map above since keys are strings, but safe practice.
     const sortedCodes = Object.keys(COUNTRY_CODES).sort((a, b) => b.length - a.length);
 
     for (const code of sortedCodes) {
@@ -277,75 +280,142 @@ const detectCountry = (phone: string, existingCountry?: string): string => {
             return COUNTRY_CODES[code];
         }
     }
-
     return 'International';
 };
 
 /**
  * Get list of available phone numbers
- * We request a HIGH limit (1000) to try and get ALL numbers, not just recent ones.
+ * SCALED UP: Fetches up to 500 pages (50,000 items) to support extreme volume.
  */
 export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> => {
   try {
-    let endpoint = '/numbers';
-    if (country && country !== 'All') {
-      endpoint = `/numbers/by-country?country=${encodeURIComponent(country)}`;
-    } else {
-        // Request a large limit to get "All" numbers
-        endpoint = '/numbers?limit=500'; 
-    }
+    let rawData: any[] = [];
+    const MAX_PAGES = 500; // Target: 50,000 numbers (500 pages * 100 items)
+    const BATCH_SIZE = 10; // 10 Requests in parallel per batch
 
-    const response: any = await apiRequest(endpoint);
+    const extractList = (res: any) => {
+        if (Array.isArray(res)) return res;
+        if (Array.isArray(res?.data)) return res.data;
+        if (Array.isArray(res?.numbers)) return res.numbers;
+        return [];
+    };
+
+    if (country && country !== 'All') {
+        // For specific country, fetch deeper than before (up to 5000 numbers)
+        const countryMaxPages = 50;
+        
+        for (let i = 0; i < countryMaxPages; i += 10) {
+             const pages = [];
+             for(let j=1; j<=10; j++) {
+                 if (i+j > countryMaxPages) break;
+                 pages.push(i+j);
+             }
+             
+             // Yield to main thread to prevent UI freeze
+             await new Promise(r => setTimeout(r, 0));
+
+             const responses = await Promise.all(
+                 pages.map(p => apiRequest(`/numbers/by-country?country=${encodeURIComponent(country)}&limit=100&page=${p}`).catch(()=>({})))
+             );
+             
+             let hasData = false;
+             responses.forEach(res => {
+                const list = extractList(res);
+                if (list.length > 0) hasData = true;
+                rawData = [...rawData, ...list];
+             });
+             
+             if (!hasData) break; // Stop if we run out of numbers for this country
+        }
+    } else {
+        // FETCHING ALL: Massive Parallel Execution
+        for (let i = 0; i < MAX_PAGES; i += BATCH_SIZE) {
+            const currentBatchPages = [];
+            for (let j = 1; j <= BATCH_SIZE; j++) {
+                const pageNum = i + j;
+                if (pageNum > MAX_PAGES) break;
+                currentBatchPages.push(pageNum);
+            }
+
+            // Yield to main thread to prevent UI freeze
+            await new Promise(r => setTimeout(r, 0));
+
+            // Execute batch
+            const batchPromises = currentBatchPages.map(page => 
+                apiRequest(`/numbers?page=${page}&limit=100`)
+                    .catch(() => ({ data: [] }))
+            );
+            
+            const batchResults = await Promise.all(batchPromises);
+            
+            let batchHasData = false;
+            batchResults.forEach(res => {
+                const list = extractList(res);
+                if (list.length > 0) batchHasData = true;
+                rawData = [...rawData, ...list];
+            });
+
+            // If empty batch, assume end of data
+            if (!batchHasData) break;
+        }
+    }
     
-    let data: any[] = [];
-    if (Array.isArray(response)) data = response;
-    else if (Array.isArray(response?.data)) data = response.data;
-    else if (Array.isArray(response?.numbers)) data = response.numbers;
-    
-    if (data.length > 0) {
-        return data.map((item: any) => ({
+    // Deduplication
+    const uniqueMap = new Map();
+    const cleanData = rawData.map((item: any) => ({
             id: item.id,
             phone_number: item.phone_number,
             country: detectCountry(item.phone_number, item.country),
             created_at: item.created_at
-        }));
-    }
+    }));
+
+    cleanData.forEach(item => {
+        if (!uniqueMap.has(item.phone_number)) {
+            uniqueMap.set(item.phone_number, item);
+        }
+    });
+
+    const finalNumbers = Array.from(uniqueMap.values());
+    if (finalNumbers.length > 0) return finalNumbers;
     
-    throw new Error("Empty list returned");
+    // Do not throw "Empty list" error as it may just be filtered out
+    return [];
 
   } catch (e) {
-    // FALLBACK STRATEGY
+    // FALLBACK: Deep OTP Scan
     try {
-        console.warn("[TalkDrove] /numbers endpoint failed or empty. Deriving numbers from OTP list...");
+        console.warn("[TalkDrove] Main fetch failed. Running deep scan...");
+        // Fetch 5 pages of OTPs to find numbers
+        const pages = [1, 2, 3, 4, 5];
+        const responses = await Promise.all(
+             pages.map(p => apiRequest(`/otps/latest?limit=100&page=${p}`).catch(()=>({})))
+        );
         
-        // Fetch a large batch of latest OTPs to find active numbers
-        const otpData: any = await apiRequest('/otps/latest?limit=200');
-        
-        let otps: any[] = [];
-        if (Array.isArray(otpData)) otps = otpData;
-        else if (Array.isArray(otpData?.data)) otps = otpData.data;
-        else if (Array.isArray(otpData?.otps)) otps = otpData.otps;
-
         const uniqueNumbers = new Map<string, TalkDroveNumber>();
-        otps.forEach((otp) => {
-            if (!otp.phone_number) return;
-            
-            const detectedCountry = detectCountry(otp.phone_number, otp.country);
-            
-            if (country && country !== 'All' && detectedCountry !== country) return;
+        
+        responses.forEach((res: any) => {
+             let otps: any[] = [];
+             if (Array.isArray(res)) otps = res;
+             else if (Array.isArray(res?.data)) otps = res.data;
+             else if (Array.isArray(res?.otps)) otps = res.otps;
 
-            if (!uniqueNumbers.has(otp.phone_number)) {
-                uniqueNumbers.set(otp.phone_number, {
-                    id: otp.id || Math.random(),
-                    phone_number: otp.phone_number,
-                    country: detectedCountry,
-                    created_at: otp.created_at
-                });
-            }
+             otps.forEach((otp) => {
+                if (!otp.phone_number) return;
+                const detectedCountry = detectCountry(otp.phone_number, otp.country);
+                if (country && country !== 'All' && detectedCountry !== country) return;
+
+                if (!uniqueNumbers.has(otp.phone_number)) {
+                    uniqueNumbers.set(otp.phone_number, {
+                        id: otp.id || Math.random(),
+                        phone_number: otp.phone_number,
+                        country: detectedCountry,
+                        created_at: otp.created_at
+                    });
+                }
+            });
         });
 
-        const result = Array.from(uniqueNumbers.values());
-        return result;
+        return Array.from(uniqueNumbers.values());
     } catch (fallbackError) {
         console.error("Fallback strategy failed", fallbackError);
         return [];
@@ -355,11 +425,9 @@ export const getNumbers = async (country?: string): Promise<TalkDroveNumber[]> =
 
 /**
  * Get OTPs for a specific phone number
- * Requests LIMIT=100 (Max allowed) to get the deepest history possible.
  */
 export const getOTPsByPhone = async (phone: string): Promise<TalkDroveOTP[]> => {
   try {
-    // REQUEST MAX LIMIT OF 100 to get "last codes" not just recent ones
     const endpoint = `/otps/by-phone/${encodeURIComponent(phone)}?limit=100`;
     const response: any = await apiRequest(endpoint);
     
@@ -378,25 +446,34 @@ export const getOTPsByPhone = async (phone: string): Promise<TalkDroveOTP[]> => 
         country: detectCountry(item.phone_number, item.country)
     }));
   } catch (e) {
-    console.error("Failed to fetch OTPs", e);
+    // Return empty array instead of throwing to keep UI stable
     return [];
   }
 };
 
 /**
  * Get Global Live Feed of OTPs
- * Fetches latest 100 OTPs across all numbers.
+ * SCALED UP: Fetches latest 500 OTPs (5 pages) to support high traffic.
  */
 export const getGlobalOTPs = async (): Promise<TalkDroveOTP[]> => {
     try {
-        const response: any = await apiRequest('/otps/latest?limit=100');
+        const pages = [1, 2, 3, 4, 5];
+        const responses = await Promise.all(
+             pages.map(p => apiRequest(`/otps/latest?limit=100&page=${p}`).catch(()=>({})))
+        );
         
-        let data = [];
-        if (Array.isArray(response)) data = response;
-        else if (Array.isArray(response?.data)) data = response.data;
-        else if (Array.isArray(response?.otps)) data = response.otps;
+        let allData: any[] = [];
+        responses.forEach((res: any) => {
+            if (Array.isArray(res)) allData = [...allData, ...res];
+            else if (Array.isArray(res?.data)) allData = [...allData, ...res.data];
+            else if (Array.isArray(res?.otps)) allData = [...allData, ...res.otps];
+        });
 
-        return data.map((item: any) => ({
+        // Unique by ID to prevent overlap
+        const unique = new Map();
+        allData.forEach(item => unique.set(item.id, item));
+        
+        return Array.from(unique.values()).map((item: any) => ({
             id: item.id,
             phone_number: item.phone_number,
             otp_code: item.otp_code,
@@ -404,7 +481,8 @@ export const getGlobalOTPs = async (): Promise<TalkDroveOTP[]> => {
             platform: item.platform || 'Service',
             created_at: item.created_at,
             country: detectCountry(item.phone_number, item.country)
-        }));
+        })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
     } catch (e) {
         console.error("Failed to fetch global OTPs", e);
         return [];
@@ -412,9 +490,17 @@ export const getGlobalOTPs = async (): Promise<TalkDroveOTP[]> => {
 };
 
 export const getHealth = async (): Promise<any> => {
-    return await apiRequest('/health');
+    try {
+        return await apiRequest('/health');
+    } catch {
+        return { status: 'down' };
+    }
 }
 
 export const getStats = async (): Promise<any> => {
-    return await apiRequest('/stats');
+    try {
+        return await apiRequest('/stats');
+    } catch {
+        return { numbers: 0, otps: 0 };
+    }
 }
