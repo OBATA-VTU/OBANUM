@@ -285,8 +285,8 @@ const detectCountry = (phone: string, existingCountry?: string): string => {
 
 /**
  * Get list of available phone numbers
- * Optimization: Now only fetches 2 pages by default to ensure speed (approx 100-200 nums)
- * Pagination is supported via parameters.
+ * Limit increased to 500 to mimic "Unlimited" feel while maintaining speed.
+ * The UI calls this with increasing page numbers.
  */
 export const getNumbers = async (country?: string, pageStart: number = 1): Promise<TalkDroveNumber[]> => {
   try {
@@ -301,10 +301,13 @@ export const getNumbers = async (country?: string, pageStart: number = 1): Promi
     const pagesToFetch = [pageStart, pageStart + 1];
     let endpoints = [];
     
+    // Use high API limit to show "Unlimited"
+    const LIMIT = 500; 
+
     if (country && country !== 'All') {
-        endpoints = pagesToFetch.map(p => `/numbers/by-country?country=${encodeURIComponent(country)}&limit=100&page=${p}`);
+        endpoints = pagesToFetch.map(p => `/numbers/by-country?country=${encodeURIComponent(country)}&limit=${LIMIT}&page=${p}`);
     } else {
-        endpoints = pagesToFetch.map(p => `/numbers?page=${p}&limit=100`);
+        endpoints = pagesToFetch.map(p => `/numbers?page=${p}&limit=${LIMIT}`);
     }
 
     // Fire requests in parallel
@@ -334,7 +337,7 @@ export const getNumbers = async (country?: string, pageStart: number = 1): Promi
 
     return Array.from(uniqueMap.values());
   } catch (e) {
-      console.warn("Fast fetch failed, returning empty.");
+      console.warn("Fetch failed, returning empty.");
       return [];
   }
 };
@@ -371,7 +374,6 @@ export const getOTPsByPhone = async (phone: string): Promise<TalkDroveOTP[]> => 
  */
 export const getGlobalOTPs = async (): Promise<TalkDroveOTP[]> => {
     try {
-        // Reduced to 2 pages for performance
         const pages = [1, 2];
         const responses = await Promise.all(
              pages.map(p => apiRequest(`/otps/latest?limit=100&page=${p}`).catch(()=>({})))
@@ -414,7 +416,6 @@ export const getStats = async (): Promise<any> => {
     try {
         return await apiRequest('/stats');
     } catch {
-        // Fallback stats if endpoint fails
         return { numbers: 5000, otps: 100000 }; 
     }
 }

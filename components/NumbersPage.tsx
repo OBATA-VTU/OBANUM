@@ -1,18 +1,19 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { getNumbers } from '../services/talkDrove';
 import { TalkDroveNumber } from '../types';
-import { Search, Copy, RefreshCcw, ChevronDown, Check, Filter, ShieldCheck, Signal, Download } from 'lucide-react';
+import { Search, Copy, RefreshCcw, ChevronDown, Check, Filter, ShieldCheck, Signal, Download, Eye } from 'lucide-react';
 import { getFlagUrl } from '../utils/countries';
 import { Loader } from './Loader';
+import { ActiveOrdersList } from './ActiveOrdersList';
 import toast from 'react-hot-toast';
 
 interface NumbersPageProps {
     onNavigate: (page: any) => void;
 }
 
-const NumberCard: React.FC<{ num: TalkDroveNumber; onCopy: (n: string) => void }> = ({ num, onCopy }) => (
+const NumberCard: React.FC<{ num: TalkDroveNumber; onSelect: (n: TalkDroveNumber) => void }> = ({ num, onSelect }) => (
     <button
-        onClick={() => onCopy(num.phone_number)}
+        onClick={() => onSelect(num)}
         className="group relative flex flex-col items-start p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300 w-full text-left overflow-hidden animate-fade-in-up"
     >
         <div className="absolute top-0 right-0 w-16 h-16 bg-slate-50 rounded-bl-full -mr-8 -mt-8 group-hover:bg-indigo-50 transition-colors"></div>
@@ -23,7 +24,7 @@ const NumberCard: React.FC<{ num: TalkDroveNumber; onCopy: (n: string) => void }
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
                     <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Active</span>
                  </div>
-                 <Copy className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                 <Eye className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
             </div>
             
             <div className="font-mono font-bold text-lg text-slate-800 group-hover:text-indigo-600 transition-colors tracking-tight mb-1">
@@ -32,7 +33,7 @@ const NumberCard: React.FC<{ num: TalkDroveNumber; onCopy: (n: string) => void }
             
             <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
                 <Signal className="w-3 h-3" />
-                <span>Voice & SMS Ready</span>
+                <span>Click to View SMS</span>
             </div>
         </div>
     </button>
@@ -43,8 +44,8 @@ const CountryAccordion: React.FC<{
     numbers: TalkDroveNumber[];
     isOpen: boolean;
     onToggle: () => void;
-    onCopy: (num: string) => void;
-}> = ({ country, numbers, isOpen, onToggle, onCopy }) => {
+    onSelect: (num: TalkDroveNumber) => void;
+}> = ({ country, numbers, isOpen, onToggle, onSelect }) => {
     const [showAll, setShowAll] = useState(false);
     const visibleNumbers = isOpen ? (showAll ? numbers : numbers.slice(0, 8)) : [];
 
@@ -87,7 +88,7 @@ const CountryAccordion: React.FC<{
                 <div className="p-6 pt-2 border-t border-slate-100 bg-slate-50/30">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {visibleNumbers.map(num => (
-                            <NumberCard key={num.id} num={num} onCopy={onCopy} />
+                            <NumberCard key={num.id} num={num} onSelect={onSelect} />
                         ))}
                     </div>
                     
@@ -113,6 +114,9 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  
+  // New State for OTP Viewer Overlay
+  const [selectedNumber, setSelectedNumber] = useState<TalkDroveNumber | null>(null);
 
   const fetchInitial = async () => {
     setLoading(true);
@@ -128,7 +132,7 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
 
   const fetchMore = async () => {
       setLoadingMore(true);
-      const nextPage = page + 2; // We fetch 2 pages at a time in the service
+      const nextPage = page + 2; 
       try {
           const newData = await getNumbers(undefined, nextPage);
           if (newData.length === 0) {
@@ -173,24 +177,14 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
       setExpanded(s);
   };
 
-  const handleCopy = (num: string) => {
-      navigator.clipboard.writeText(num);
-      toast.custom((t) => (
-         <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-slate-700`}>
-             <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-slate-900">
-                 <Check className="w-6 h-6" />
-             </div>
-             <div>
-                 <div className="font-bold text-lg">Number Secured</div>
-                 <div className="text-slate-400 text-sm">Monitoring incoming packets</div>
-             </div>
-             <button onClick={() => { toast.dismiss(t.id); onNavigate('feed'); }} className="ml-4 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg font-bold text-sm">Open Terminal</button>
-         </div>
-      ));
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 p-4 lg:p-8">
+        
+        {/* OTP Viewer Overlay */}
+        {selectedNumber && (
+            <ActiveOrdersList selectedNumber={selectedNumber} onClose={() => setSelectedNumber(null)} />
+        )}
+
         <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
@@ -199,7 +193,7 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
                         Digital SIM Wallet
                     </h1>
                     <p className="text-slate-500 text-lg">
-                        Access <span className="font-bold text-slate-900">{allNumbers.length}</span> secure nodes.
+                        Access <span className="font-bold text-slate-900">{allNumbers.length}+</span> secure nodes.
                     </p>
                 </div>
                 
@@ -241,7 +235,7 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
                                 numbers={n} 
                                 isOpen={expanded.has(c)} 
                                 onToggle={() => toggle(c)} 
-                                onCopy={handleCopy} 
+                                onSelect={setSelectedNumber} 
                             />
                         ))}
                     </div>

@@ -10,12 +10,19 @@ import { About } from './components/About';
 import { PrivacyPolicy, TermsOfService } from './components/Legal';
 import { Contact } from './components/Contact';
 import { StatusPage } from './components/StatusPage';
+import { AdminPanel } from './components/AdminPanel';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<PageType>('home');
+  const [currentPage, setCurrentPage] = useState<PageType | 'admin'>('home');
 
   useEffect(() => {
+    // Check initial URL for /admin
+    if (window.location.pathname === '/admin') {
+        setCurrentPage('admin');
+        return;
+    }
+
     const handlePopState = (event: PopStateEvent) => {
       if (event.state?.page) setCurrentPage(event.state.page);
       else setCurrentPage('home');
@@ -30,6 +37,11 @@ function App() {
     window.scrollTo(0, 0);
   };
 
+  // Special Admin Route
+  if (currentPage === 'admin') {
+      return <AdminPanel />;
+  }
+
   // Determine Layout
   // Added 'status' here so it uses the App Layout (Sidebar/BottomNav) instead of Website Layout
   const isAppLayout = ['dashboard', 'numbers', 'feed', 'status'].includes(currentPage);
@@ -40,10 +52,10 @@ function App() {
             <Toaster position="top-right" />
             
             {/* Desktop Sidebar */}
-            <Sidebar currentPage={currentPage} onNavigate={navigate} />
+            <Sidebar currentPage={currentPage as PageType} onNavigate={navigate} />
             
             {/* Mobile Bottom Navigation */}
-            <BottomNav currentPage={currentPage} onNavigate={navigate} />
+            <BottomNav currentPage={currentPage as PageType} onNavigate={navigate} />
 
             <main className="flex-1 lg:ml-72 pb-24 lg:pb-0 transition-all duration-300">
                 {currentPage === 'dashboard' && <Dashboard onNavigate={navigate} />}
@@ -58,7 +70,7 @@ function App() {
   // Website Layout
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
-      <Navbar onNavigate={navigate} currentPage={currentPage} />
+      <Navbar onNavigate={navigate} currentPage={currentPage as PageType} />
       
       <main className="flex-grow flex flex-col">
         {currentPage === 'home' && <Hero onStart={() => navigate('dashboard')} />}

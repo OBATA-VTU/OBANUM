@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { TalkDroveNumber, TalkDroveOTP } from '../types';
 import { getOTPsByPhone } from '../services/talkDrove';
-import { RefreshCw, Copy, Radio, Lock, MessageSquare, Search } from 'lucide-react';
+import { RefreshCw, Copy, Radio, Lock, MessageSquare, Search, Clock, Globe, Shield, Terminal, Hash, X } from 'lucide-react';
 import { getFlagUrl } from '../utils/countries';
 import toast from 'react-hot-toast';
 
 interface ActiveOrdersListProps {
     selectedNumber: TalkDroveNumber | null;
+    onClose: () => void;
 }
 
-export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ selectedNumber }) => {
+export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ selectedNumber, onClose }) => {
     const [messages, setMessages] = useState<TalkDroveOTP[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchMsg, setSearchMsg] = useState('');
@@ -24,28 +25,19 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ selectedNumb
         } catch (error) { } finally { if (showLoading) setLoading(false); }
     };
 
-    // Auto-refresh logic
     useEffect(() => {
         setMessages([]); 
-        
         if (selectedNumber) {
             fetchMessages(true);
-            
-            // Interval for data fetch
             if (intervalRef.current) clearInterval(intervalRef.current);
-            intervalRef.current = setInterval(() => {
-                fetchMessages(false);
-            }, 5000);
+            intervalRef.current = setInterval(() => { fetchMessages(false); }, 5000);
         }
-        
-        return () => { 
-            if (intervalRef.current) clearInterval(intervalRef.current);
-        };
+        return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
     }, [selectedNumber?.id]);
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
-        toast.success("Code copied!");
+        toast.success("Copied to clipboard");
     };
 
     const filteredMessages = messages.filter(m => {
@@ -58,98 +50,133 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ selectedNumb
     if (!selectedNumber) return null;
 
     return (
-        <div className="bg-[#0f172a] rounded-xl overflow-hidden border border-slate-800 shadow-xl flex flex-col h-[650px] w-full max-w-2xl mx-auto font-sans relative">
-            
-            {/* Header: Chat Info */}
-            <div className="bg-slate-900 pt-6 pb-4 px-6 border-b border-slate-800">
-                <div className="flex items-center gap-4 mb-4">
-                    <img 
-                        src={getFlagUrl(selectedNumber.country)} 
-                        alt={selectedNumber.country} 
-                        className="w-12 h-12 rounded-full border-2 border-slate-700 object-cover"
-                    />
-                    <div>
-                        <div className="font-mono font-bold text-white text-xl tracking-wide flex items-center gap-2">
-                            {selectedNumber.phone_number}
-                            <button onClick={() => copyToClipboard(selectedNumber.phone_number)} className="text-slate-500 hover:text-white transition-colors">
-                                <Copy className="w-4 h-4" />
-                            </button>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-emerald-500 font-bold mt-1">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                            Online
-                        </div>
-                    </div>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in-up">
+            <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-2xl flex flex-col h-[85vh] w-full max-w-4xl font-sans relative">
+                
+                {/* Header Area */}
+                <div className="bg-slate-900 text-white p-6 border-b border-slate-800 relative">
+                    <button 
+                        onClick={onClose}
+                        className="absolute top-4 right-4 p-2 bg-slate-800 rounded-full hover:bg-red-600 transition-colors z-10"
+                    >
+                        <X className="w-5 h-5 text-white" />
+                    </button>
 
-                {/* Message Search Bar */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input 
-                        type="text" 
-                        placeholder="Search messages..."
-                        value={searchMsg}
-                        onChange={(e) => setSearchMsg(e.target.value)}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
-                    />
-                </div>
-            </div>
-
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#0f172a] scroll-smooth">
-                {loading && messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-4">
-                        <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-xs font-mono uppercase tracking-widest">Scanning frequency...</span>
-                    </div>
-                ) : filteredMessages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center opacity-70">
-                        <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4 text-slate-600 border border-slate-800">
-                            <MessageSquare className="w-8 h-8" />
-                        </div>
-                        <h3 className="text-slate-400 font-bold mb-1">
-                            {searchMsg ? 'No matches found' : 'Inbox Empty'}
-                        </h3>
-                        <p className="text-slate-600 text-xs font-mono max-w-xs">
-                            {searchMsg ? `No SMS contains "${searchMsg}"` : 'New messages will appear here automatically.'}
-                        </p>
-                    </div>
-                ) : (
-                    filteredMessages.map((msg, idx) => (
-                        <div key={idx} className="flex flex-col items-start max-w-[95%] animate-fade-in-up">
-                            <div className="bg-slate-800 p-4 rounded-xl rounded-tl-none border border-slate-700 text-slate-300 text-sm shadow-sm w-full">
-                                <div className="flex justify-between items-start mb-2 border-b border-slate-700/50 pb-2">
-                                     <div className="font-bold text-indigo-400 text-xs uppercase tracking-wider flex items-center gap-2">
-                                        {msg.platform || 'SMS'}
-                                     </div>
-                                     <span className="text-slate-600 font-mono text-[10px]">{new Date(msg.created_at).toLocaleTimeString()}</span>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        {/* Number Info */}
+                        <div className="flex items-center gap-4">
+                            <img 
+                                src={getFlagUrl(selectedNumber.country)} 
+                                alt={selectedNumber.country} 
+                                className="w-16 h-16 rounded-2xl border-4 border-slate-800 shadow-lg object-cover"
+                            />
+                            <div>
+                                <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">
+                                    {selectedNumber.country} • Secure Line
                                 </div>
-                                
-                                <div className="font-mono leading-relaxed mb-3 text-slate-300 break-words">
-                                    {msg.message || msg.sms_text}
-                                </div>
-                                
-                                {msg.otp_code && (
-                                    <div 
-                                        onClick={() => copyToClipboard(msg.otp_code)}
-                                        className="bg-[#050911] border border-slate-700 rounded-lg p-3 flex items-center justify-between cursor-pointer hover:border-indigo-500 transition-all"
+                                <div className="text-3xl md:text-4xl font-mono font-bold tracking-tight flex items-center gap-3">
+                                    {selectedNumber.phone_number}
+                                    <button 
+                                        onClick={() => copyToClipboard(selectedNumber.phone_number)}
+                                        className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 transition-colors"
                                     >
-                                        <div className="flex flex-col">
-                                            <span className="text-[9px] text-slate-500 uppercase font-bold tracking-widest mb-0.5">Code</span>
-                                            <span className="font-mono text-xl font-bold text-white tracking-widest">{msg.otp_code}</span>
-                                        </div>
-                                        <Copy className="w-4 h-4 text-slate-600 hover:text-white transition-colors" />
-                                    </div>
-                                )}
+                                        <Copy className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    ))
-                )}
-            </div>
+                    </div>
 
-            {/* Footer */}
-            <div className="p-3 bg-slate-900 border-t border-slate-800 flex justify-center text-[10px] text-slate-600 font-mono gap-2 uppercase tracking-wider">
-                <Lock className="w-3 h-3" /> Secure Connection
+                    {/* Search Bar */}
+                    <div className="mt-8 relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <input 
+                            type="text" 
+                            placeholder="Filter by service name, code, or content..."
+                            value={searchMsg}
+                            onChange={(e) => setSearchMsg(e.target.value)}
+                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:bg-slate-800 focus:border-indigo-500 transition-all font-mono"
+                        />
+                    </div>
+                </div>
+
+                {/* Content Area - Data List */}
+                <div className="flex-1 bg-slate-50 overflow-y-auto p-4 md:p-6 space-y-4">
+                    {loading && messages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
+                             <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                             <div className="text-sm font-bold tracking-widest uppercase">Decrypting incoming packets...</div>
+                        </div>
+                    ) : filteredMessages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full opacity-60">
+                            <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mb-4 text-slate-400">
+                                <Hash className="w-10 h-10" />
+                            </div>
+                            <h3 className="text-slate-600 font-bold">Inbox Empty</h3>
+                            <p className="text-slate-400 text-sm max-w-xs text-center mt-2">
+                                Waiting for SMS... <br/> Use this number on your service now.
+                            </p>
+                        </div>
+                    ) : (
+                        filteredMessages.map((msg, idx) => (
+                            <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in-up hover:shadow-md transition-all">
+                                
+                                {/* Card Header: Metadata */}
+                                <div className="bg-slate-50 px-5 py-3 border-b border-slate-100 flex flex-wrap justify-between items-center gap-2">
+                                    <div className="flex items-center gap-3">
+                                        <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wide border border-indigo-100">
+                                            {msg.platform || 'System'}
+                                        </span>
+                                        <span className="flex items-center gap-1 text-[11px] font-mono text-slate-500">
+                                            <Clock className="w-3 h-3" />
+                                            {new Date(msg.created_at).toLocaleTimeString()}
+                                        </span>
+                                        <span className="flex items-center gap-1 text-[11px] font-mono text-slate-500 border-l border-slate-200 pl-3">
+                                            <Globe className="w-3 h-3" />
+                                            {msg.country || selectedNumber.country}
+                                        </span>
+                                    </div>
+                                    <div className="text-[10px] font-mono text-slate-400">
+                                        ID: #{msg.id}
+                                    </div>
+                                </div>
+
+                                {/* Card Body: Content */}
+                                <div className="p-5 flex flex-col md:flex-row gap-6 items-start">
+                                    
+                                    {/* The Code (Main Focus) */}
+                                    {msg.otp_code && (
+                                        <div 
+                                            onClick={() => copyToClipboard(msg.otp_code)}
+                                            className="bg-[#0b0f19] text-white p-4 rounded-xl min-w-[140px] text-center cursor-pointer group hover:bg-indigo-600 transition-colors relative overflow-hidden"
+                                        >
+                                            <div className="text-[10px] uppercase font-bold text-slate-500 mb-1 group-hover:text-indigo-200">OTP Code</div>
+                                            <div className="text-2xl font-mono font-bold tracking-widest">{msg.otp_code}</div>
+                                            <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/20 rounded-xl"></div>
+                                        </div>
+                                    )}
+
+                                    {/* Raw Message */}
+                                    <div className="flex-1">
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                            <Terminal className="w-3 h-3" /> Raw Message
+                                        </div>
+                                        <div className="font-mono text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 break-words">
+                                            {msg.message || msg.sms_text}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+                
+                {/* Footer */}
+                <div className="bg-white border-t border-slate-200 p-3 flex justify-center">
+                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <Shield className="w-3 h-3" /> TLS 1.3 Encrypted Connection
+                     </div>
+                </div>
             </div>
         </div>
     );
