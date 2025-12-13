@@ -4,6 +4,7 @@ import { TalkDroveOTP } from '../types';
 import { RefreshCw, Search, Clock, Copy, Terminal, Shield, Lock } from 'lucide-react';
 import { getFlagUrl } from '../utils/countries';
 import toast from 'react-hot-toast';
+import { Loader } from './Loader';
 
 export const LiveFeed: React.FC = () => {
   const [messages, setMessages] = useState<TalkDroveOTP[]>([]);
@@ -84,8 +85,11 @@ export const LiveFeed: React.FC = () => {
         {/* Feed Stream */}
         <div className="max-w-5xl mx-auto px-4 py-8">
             {loading && messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-40">
-                    <div className="font-mono text-indigo-400 animate-pulse text-sm">INITIALIZING SECURE LINK...</div>
+                <div className="flex justify-center py-20">
+                     <div className="bg-[#050911] p-8 rounded-xl border border-slate-800 flex flex-col items-center">
+                         <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                         <div className="font-mono text-indigo-400 animate-pulse text-sm tracking-widest">INITIALIZING SECURE LINK...</div>
+                     </div>
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="text-center py-20 opacity-50">
@@ -95,7 +99,7 @@ export const LiveFeed: React.FC = () => {
             ) : (
                 <div className="grid gap-4">
                     {filtered.map((msg, idx) => (
-                        <div key={`${msg.id}-${idx}`} className="group relative bg-slate-900/40 border border-slate-800/60 rounded-xl p-5 hover:bg-slate-900/80 hover:border-indigo-500/30 transition-all duration-300 overflow-hidden">
+                        <div key={`${msg.id}-${idx}`} className="group relative bg-slate-900/40 border border-slate-800/60 rounded-xl p-5 hover:bg-slate-900/80 hover:border-indigo-500/30 transition-all duration-300 overflow-hidden animate-fade-in-up">
                             
                             {/* Glow Effect on Hover */}
                             <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50 opacity-0 group-hover:opacity-100 transition-opacity"></div>

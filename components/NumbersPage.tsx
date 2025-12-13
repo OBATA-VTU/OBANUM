@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { getNumbers } from '../services/talkDrove';
 import { TalkDroveNumber } from '../types';
-import { Search, Copy, RefreshCcw, ChevronDown, Check, Filter, ShieldCheck, Signal, Globe } from 'lucide-react';
+import { Search, Copy, RefreshCcw, ChevronDown, Check, Filter, ShieldCheck, Signal, Download } from 'lucide-react';
 import { getFlagUrl } from '../utils/countries';
+import { Loader } from './Loader';
 import toast from 'react-hot-toast';
 
 interface NumbersPageProps {
@@ -12,7 +13,7 @@ interface NumbersPageProps {
 const NumberCard: React.FC<{ num: TalkDroveNumber; onCopy: (n: string) => void }> = ({ num, onCopy }) => (
     <button
         onClick={() => onCopy(num.phone_number)}
-        className="group relative flex flex-col items-start p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300 w-full text-left overflow-hidden"
+        className="group relative flex flex-col items-start p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300 w-full text-left overflow-hidden animate-fade-in-up"
     >
         <div className="absolute top-0 right-0 w-16 h-16 bg-slate-50 rounded-bl-full -mr-8 -mt-8 group-hover:bg-indigo-50 transition-colors"></div>
         
@@ -20,7 +21,7 @@ const NumberCard: React.FC<{ num: TalkDroveNumber; onCopy: (n: string) => void }
             <div className="flex justify-between items-start mb-3">
                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Active Node</span>
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Active</span>
                  </div>
                  <Copy className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
             </div>
@@ -108,31 +109,55 @@ const CountryAccordion: React.FC<{
 export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
   const [allNumbers, setAllNumbers] = useState<TalkDroveNumber[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
+  const fetchInitial = async () => {
+    setLoading(true);
+    try {
+        const data = await getNumbers(undefined, 1);
+        setAllNumbers(data);
+    } catch (e) {
+        toast.error("Gateway sync error. Retrying secure connection...");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const fetchMore = async () => {
+      setLoadingMore(true);
+      const nextPage = page + 2; // We fetch 2 pages at a time in the service
+      try {
+          const newData = await getNumbers(undefined, nextPage);
+          if (newData.length === 0) {
+              toast('No more numbers available.', { icon: '🚫' });
+          } else {
+              setAllNumbers(prev => [...prev, ...newData]);
+              setPage(nextPage);
+          }
+      } catch (e) {
+          toast.error("Failed to load more numbers.");
+      } finally {
+          setLoadingMore(false);
+      }
+  };
+
   useEffect(() => {
-    const fetch = async () => {
-        setLoading(true);
-        try {
-            const data = await getNumbers();
-            setAllNumbers(data);
-        } catch (e) {
-            toast.error("Gateway sync error. Retrying secure connection...");
-        } finally {
-            setLoading(false);
-        }
-    };
-    fetch();
+    fetchInitial();
   }, []);
 
   const groups = useMemo(() => {
     const g: Record<string, TalkDroveNumber[]> = {};
-    allNumbers.forEach(n => {
-        if (searchTerm === '' || n.country.toLowerCase().includes(searchTerm.toLowerCase()) || n.phone_number.includes(searchTerm)) {
-            if (!g[n.country]) g[n.country] = [];
-            g[n.country].push(n);
-        }
+    const filtered = allNumbers.filter(n => {
+        if (!searchTerm) return true;
+        return n.country.toLowerCase().includes(searchTerm.toLowerCase()) || n.phone_number.includes(searchTerm);
+    });
+
+    filtered.forEach(n => {
+        if (!g[n.country]) g[n.country] = [];
+        g[n.country].push(n);
     });
     return Object.entries(g).sort((a, b) => a[0].localeCompare(b[0]));
   }, [allNumbers, searchTerm]);
@@ -174,7 +199,7 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
                         Digital SIM Wallet
                     </h1>
                     <p className="text-slate-500 text-lg">
-                        Access <span className="font-bold text-slate-900">{allNumbers.length}</span> secure nodes across 50+ regions.
+                        Access <span className="font-bold text-slate-900">{allNumbers.length}</span> secure nodes.
                     </p>
                 </div>
                 
@@ -197,10 +222,7 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
 
             {/* Content */}
             {loading ? (
-                <div className="flex flex-col items-center justify-center py-40">
-                    <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
-                    <div className="text-slate-400 font-medium animate-pulse">Synchronizing Global Inventory...</div>
-                </div>
+                <Loader text="SYNCING GLOBAL INVENTORY..." />
             ) : groups.length === 0 ? (
                 <div className="text-center py-20 bg-white rounded-3xl border border-slate-200">
                     <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
@@ -210,18 +232,36 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
                     <button onClick={() => setSearchTerm('')} className="text-indigo-600 font-bold mt-2 hover:underline">Clear Search</button>
                 </div>
             ) : (
-                <div className="space-y-2">
-                    {groups.map(([c, n]) => (
-                        <CountryAccordion 
-                            key={c} 
-                            country={c} 
-                            numbers={n} 
-                            isOpen={expanded.has(c)} 
-                            onToggle={() => toggle(c)} 
-                            onCopy={handleCopy} 
-                        />
-                    ))}
-                </div>
+                <>
+                    <div className="space-y-2">
+                        {groups.map(([c, n]) => (
+                            <CountryAccordion 
+                                key={c} 
+                                country={c} 
+                                numbers={n} 
+                                isOpen={expanded.has(c)} 
+                                onToggle={() => toggle(c)} 
+                                onCopy={handleCopy} 
+                            />
+                        ))}
+                    </div>
+
+                    {/* Load More Button */}
+                    <div className="mt-8 text-center">
+                        <button 
+                            onClick={fetchMore}
+                            disabled={loadingMore}
+                            className="inline-flex items-center justify-center px-8 py-4 bg-white border border-slate-300 rounded-full text-slate-600 font-bold shadow-sm hover:bg-slate-50 hover:border-indigo-500 hover:text-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loadingMore ? (
+                                <RefreshCcw className="w-5 h-5 animate-spin mr-2" />
+                            ) : (
+                                <Download className="w-5 h-5 mr-2" />
+                            )}
+                            {loadingMore ? 'Fetching...' : 'Load More Numbers'}
+                        </button>
+                    </div>
+                </>
             )}
         </div>
     </div>

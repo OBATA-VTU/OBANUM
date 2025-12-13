@@ -98,9 +98,9 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ selectedNumb
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#0f172a] scroll-smooth">
                 {loading && messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-3">
-                        <Radio className="w-8 h-8 animate-pulse text-indigo-500" />
-                        <span className="text-xs font-mono uppercase tracking-widest">Checking for messages...</span>
+                    <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-4">
+                        <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-xs font-mono uppercase tracking-widest">Scanning frequency...</span>
                     </div>
                 ) : filteredMessages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center opacity-70">
