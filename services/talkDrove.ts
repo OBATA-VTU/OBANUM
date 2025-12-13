@@ -285,10 +285,9 @@ const detectCountry = (phone: string, existingCountry?: string): string => {
 
 /**
  * Get list of available phone numbers
- * Limit increased to 500 to mimic "Unlimited" feel while maintaining speed.
- * The UI calls this with increasing page numbers.
+ * Use this for "Load More" or specific searches
  */
-export const getNumbers = async (country?: string, pageStart: number = 1): Promise<TalkDroveNumber[]> => {
+export const getNumbers = async (country?: string, pageStart: number = 1, limit: number = 100): Promise<TalkDroveNumber[]> => {
   try {
     const extractList = (res: any) => {
         if (Array.isArray(res)) return res;
@@ -297,20 +296,15 @@ export const getNumbers = async (country?: string, pageStart: number = 1): Promi
         return [];
     };
 
-    // Parallel fetch of 2 pages max for speed
-    const pagesToFetch = [pageStart, pageStart + 1];
     let endpoints = [];
-    
-    // Use high API limit to show "Unlimited"
-    const LIMIT = 500; 
-
+    // We construct the URL with the passed limit
     if (country && country !== 'All') {
-        endpoints = pagesToFetch.map(p => `/numbers/by-country?country=${encodeURIComponent(country)}&limit=${LIMIT}&page=${p}`);
+        endpoints = [`/numbers/by-country?country=${encodeURIComponent(country)}&limit=${limit}&page=${pageStart}`];
     } else {
-        endpoints = pagesToFetch.map(p => `/numbers?page=${p}&limit=${LIMIT}`);
+        endpoints = [`/numbers?page=${pageStart}&limit=${limit}`];
     }
 
-    // Fire requests in parallel
+    // Fire requests
     const responses = await Promise.all(
         endpoints.map(ep => apiRequest(ep).catch(() => ({ data: [] })))
     );
@@ -320,7 +314,6 @@ export const getNumbers = async (country?: string, pageStart: number = 1): Promi
         rawData = [...rawData, ...extractList(res)];
     });
 
-    // Deduplication & Cleaning
     const uniqueMap = new Map();
     const cleanData = rawData.map((item: any) => ({
             id: item.id,
@@ -337,7 +330,6 @@ export const getNumbers = async (country?: string, pageStart: number = 1): Promi
 
     return Array.from(uniqueMap.values());
   } catch (e) {
-      console.warn("Fetch failed, returning empty.");
       return [];
   }
 };
@@ -374,9 +366,9 @@ export const getOTPsByPhone = async (phone: string): Promise<TalkDroveOTP[]> => 
  */
 export const getGlobalOTPs = async (): Promise<TalkDroveOTP[]> => {
     try {
-        const pages = [1, 2];
+        const pages = [1];
         const responses = await Promise.all(
-             pages.map(p => apiRequest(`/otps/latest?limit=100&page=${p}`).catch(()=>({})))
+             pages.map(p => apiRequest(`/otps/latest?limit=50&page=${p}`).catch(()=>({})))
         );
         
         let allData: any[] = [];
@@ -414,8 +406,9 @@ export const getHealth = async (): Promise<any> => {
 
 export const getStats = async (): Promise<any> => {
     try {
-        return await apiRequest('/stats');
+        const res: any = await apiRequest('/stats');
+        return res || { numbers: 0, otps: 0, countries: 0 };
     } catch {
-        return { numbers: 5000, otps: 100000 }; 
+        return { numbers: 0, otps: 0, countries: 0 }; 
     }
 }

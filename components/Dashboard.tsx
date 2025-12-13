@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getStats, getGlobalOTPs } from '../services/talkDrove';
+import { getStats } from '../services/talkDrove';
 import { Smartphone, Globe, Activity, Radio, ChevronRight, Zap, Server, Shield } from 'lucide-react';
 import { Loader } from './Loader';
 
@@ -8,23 +8,22 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const [stats, setStats] = useState({ numbers: 0, countries: 50, totalOtps: 0 });
+  const [stats, setStats] = useState({ numbers: 0, countries: 0, totalOtps: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
         try {
-            const [statsData] = await Promise.all([
-                getStats().catch(() => ({ numbers: 500, countries: 40, otps: 15000 })), 
-            ]);
+            const statsData = await getStats();
             
+            // "Say the truth no lies" - Use actual data, default to 0 if API is empty/failed
             setStats({
-                numbers: statsData.numbers || 2150, 
-                countries: statsData.countries || 52,
-                totalOtps: statsData.otps || 84200
+                numbers: statsData.numbers || 0, 
+                countries: statsData.countries || 0,
+                totalOtps: statsData.otps || 0
             });
         } catch (e) {
-            // silent fallback
+            setStats({ numbers: 0, countries: 0, totalOtps: 0 });
         } finally {
             setLoading(false);
         }
@@ -56,7 +55,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 </div>
             </div>
 
-            {/* 2. Grid Stats */}
+            {/* 2. Grid Stats - DISPLAYING REAL DATA */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:shadow-lg transition-shadow">
                     <div className="flex items-center gap-4 mb-4">

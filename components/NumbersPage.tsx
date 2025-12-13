@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { getNumbers } from '../services/talkDrove';
 import { TalkDroveNumber } from '../types';
-import { Search, Copy, RefreshCcw, ChevronDown, Check, Filter, ShieldCheck, Signal, Download, Eye } from 'lucide-react';
+import { Search, RefreshCcw, ChevronDown, Filter, ShieldCheck, Signal, Download, Eye } from 'lucide-react';
 import { getFlagUrl } from '../utils/countries';
 import { Loader } from './Loader';
 import { ActiveOrdersList } from './ActiveOrdersList';
@@ -110,21 +110,49 @@ const CountryAccordion: React.FC<{
 export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
   const [allNumbers, setAllNumbers] = useState<TalkDroveNumber[]>([]);
   const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [loadingText, setLoadingText] = useState('INITIALIZING...');
+  
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
+  const [lastPageFetched, setLastPageFetched] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  
-  // New State for OTP Viewer Overlay
   const [selectedNumber, setSelectedNumber] = useState<TalkDroveNumber | null>(null);
 
-  const fetchInitial = async () => {
+  // DEEP SCAN LOGIC
+  // Fetches a massive chunk of pages at once to ensure diversity
+  const fetchDeepScan = async () => {
     setLoading(true);
+    setProgress(0);
+    setLoadingText('ESTABLISHING SECURE CONNECTION...');
+
     try {
-        const data = await getNumbers(undefined, 1);
-        setAllNumbers(data);
+        let aggregatedNumbers: TalkDroveNumber[] = [];
+        const BATCH_SIZE = 10; // Fetch 10 pages initially to show 1000 numbers
+        const ITEMS_PER_PAGE = 100;
+
+        for (let i = 1; i <= BATCH_SIZE; i++) {
+            setLoadingText(`DOWNLOADING DATA PACKET ${i} OF ${BATCH_SIZE}...`);
+            const data = await getNumbers(undefined, i, ITEMS_PER_PAGE);
+            
+            if (data.length > 0) {
+                aggregatedNumbers = [...aggregatedNumbers, ...data];
+            }
+
+            // Update Progress Bar
+            const percent = Math.round((i / BATCH_SIZE) * 100);
+            setProgress(percent);
+        }
+
+        // Deduplicate
+        const unique = new Map();
+        aggregatedNumbers.forEach(n => unique.set(n.phone_number, n));
+        
+        setAllNumbers(Array.from(unique.values()));
+        setLastPageFetched(BATCH_SIZE);
+
     } catch (e) {
-        toast.error("Gateway sync error. Retrying secure connection...");
+        toast.error("Scan interrupted. Showing partial results.");
     } finally {
         setLoading(false);
     }
@@ -132,14 +160,28 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
 
   const fetchMore = async () => {
       setLoadingMore(true);
-      const nextPage = page + 2; 
+      const startPage = lastPageFetched + 1;
+      const endPage = startPage + 2; // Fetch 3 more pages
+      
       try {
-          const newData = await getNumbers(undefined, nextPage);
-          if (newData.length === 0) {
-              toast('No more numbers available.', { icon: '🚫' });
+          let newNumbers: TalkDroveNumber[] = [];
+          for (let i = startPage; i <= endPage; i++) {
+              const data = await getNumbers(undefined, i, 100);
+              newNumbers = [...newNumbers, ...data];
+          }
+
+          if (newNumbers.length === 0) {
+              toast('Database end reached.', { icon: '🚫' });
           } else {
-              setAllNumbers(prev => [...prev, ...newData]);
-              setPage(nextPage);
+              setAllNumbers(prev => {
+                  const combined = [...prev, ...newNumbers];
+                  // dedupe
+                  const unique = new Map();
+                  combined.forEach(n => unique.set(n.phone_number, n));
+                  return Array.from(unique.values());
+              });
+              setLastPageFetched(endPage);
+              toast.success(`Loaded ${newNumbers.length} new numbers`);
           }
       } catch (e) {
           toast.error("Failed to load more numbers.");
@@ -149,7 +191,7 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
   };
 
   useEffect(() => {
-    fetchInitial();
+    fetchDeepScan();
   }, []);
 
   const groups = useMemo(() => {
@@ -167,8 +209,11 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
   }, [allNumbers, searchTerm]);
 
   useEffect(() => {
-      if (searchTerm) setExpanded(new Set(groups.map(g => g[0])));
-  }, [searchTerm, groups.length]);
+      // Auto-expand if we have results
+      if (groups.length > 0) {
+           setExpanded(new Set(groups.map(g => g[0])));
+      }
+  }, [groups.length]);
 
   const toggle = (c: string) => {
       const s = new Set(expanded);
@@ -185,15 +230,18 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
             <ActiveOrdersList selectedNumber={selectedNumber} onClose={() => setSelectedNumber(null)} />
         )}
 
+        {/* Loading Overlay with Progress */}
+        {loading && <Loader text={loadingText} progress={progress} />}
+
         <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
                 <div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3">
-                        Digital SIM Wallet
+                        Global Inventory
                     </h1>
                     <p className="text-slate-500 text-lg">
-                        Access <span className="font-bold text-slate-900">{allNumbers.length}+</span> secure nodes.
+                        Accessing <span className="font-bold text-slate-900">{allNumbers.length}</span> verified nodes across <span className="font-bold text-slate-900">{groups.length}</span> regions.
                     </p>
                 </div>
                 
@@ -202,28 +250,27 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                         <input 
                             type="text" 
-                            placeholder="Find country..." 
+                            placeholder="Search country..." 
                             className="w-full pl-10 pr-4 py-2 bg-transparent outline-none text-slate-700 font-medium placeholder-slate-400"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <button onClick={() => window.location.reload()} className="p-2 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-xl transition-colors">
+                    <button onClick={() => fetchDeepScan()} className="p-2 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-xl transition-colors">
                         <RefreshCcw className="w-5 h-5" />
                     </button>
                 </div>
             </div>
 
             {/* Content */}
-            {loading ? (
-                <Loader text="SYNCING GLOBAL INVENTORY..." />
-            ) : groups.length === 0 ? (
+            {!loading && groups.length === 0 ? (
                 <div className="text-center py-20 bg-white rounded-3xl border border-slate-200">
                     <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
                         <Filter className="w-10 h-10" />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900">No matches found</h3>
-                    <button onClick={() => setSearchTerm('')} className="text-indigo-600 font-bold mt-2 hover:underline">Clear Search</button>
+                    <h3 className="text-xl font-bold text-slate-900">Inventory Empty</h3>
+                    <p className="text-slate-500 mt-2">Try refreshing the secure link or search for a different region.</p>
+                    <button onClick={() => setSearchTerm('')} className="text-indigo-600 font-bold mt-2 hover:underline">Clear Filters</button>
                 </div>
             ) : (
                 <>
@@ -241,7 +288,7 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
                     </div>
 
                     {/* Load More Button */}
-                    <div className="mt-8 text-center">
+                    <div className="mt-8 text-center pb-20">
                         <button 
                             onClick={fetchMore}
                             disabled={loadingMore}
@@ -252,7 +299,7 @@ export const NumbersPage: React.FC<NumbersPageProps> = ({ onNavigate }) => {
                             ) : (
                                 <Download className="w-5 h-5 mr-2" />
                             )}
-                            {loadingMore ? 'Fetching...' : 'Load More Numbers'}
+                            {loadingMore ? 'Decrypting Additional Nodes...' : 'Load Archived Numbers'}
                         </button>
                     </div>
                 </>
