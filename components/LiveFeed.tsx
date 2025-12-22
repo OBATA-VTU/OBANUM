@@ -10,22 +10,26 @@ export const LiveFeed: React.FC = () => {
   const [messages, setMessages] = useState<TalkDroveOTP[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchGlobal = async () => {
-    if (isPaused) return;
     try {
       const data = await getGlobalOTPs();
       setMessages(data);
     } catch (e) { } finally { setLoading(false); }
   };
 
+  const handleRefresh = () => {
+      setLoading(true);
+      fetchGlobal();
+      toast.success("Feed updated");
+  };
+
   useEffect(() => {
     fetchGlobal();
-    intervalRef.current = setInterval(fetchGlobal, 4000); 
+    intervalRef.current = setInterval(fetchGlobal, 5000); 
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isPaused]);
+  }, []);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -72,10 +76,11 @@ export const LiveFeed: React.FC = () => {
                             />
                         </div>
                         <button 
-                            onClick={() => setIsPaused(!isPaused)}
-                            className={`p-2 rounded-lg border transition-all ${isPaused ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'}`}
+                            onClick={handleRefresh}
+                            className="p-2 rounded-lg bg-indigo-600 border border-indigo-500 text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20"
+                            title="Force Reload Data"
                         >
-                            {isPaused ? <Lock className="w-5 h-5" /> : <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />}
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
                 </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Phone, Radio, Activity, LogOut } from 'lucide-react';
+import { LayoutDashboard, Phone, Radio, Activity, LogOut, Code2 } from 'lucide-react';
 import { PageType } from './Navbar';
 
 interface SidebarProps {
@@ -14,6 +14,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
     { id: 'numbers', label: 'Numbers', icon: Phone },
     { id: 'feed', label: 'Live Feed', icon: Radio },
     { id: 'status', label: 'Status', icon: Activity },
+    { id: 'docs', label: 'Developers', icon: Code2 },
   ];
 
   const handleNav = (page: string) => {
@@ -29,11 +30,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
         {/* 1. Brand / Logo Area */}
         <div className="h-20 flex items-center px-6 border-b border-slate-100">
              <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleNav('home')}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-indigo-600">
-                    <path d="M12 2L21 6.9V17L12 22L3 17V6.9L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12 12M9 12A3 3 0 1 0 15 12A3 3 0 1 0 9 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-indigo-600 drop-shadow-sm">
+                    <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" fill="currentColor" stroke="none" />
+                    <path d="M12 18.5V12M12 12V5.5M12 12L17.5 15M12 12L6.5 15" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="text-xl font-bold text-slate-900 tracking-tight">Obanum</span>
+                <span className="text-xl font-extrabold text-slate-900 tracking-tight">Obanum</span>
              </div>
         </div>
 

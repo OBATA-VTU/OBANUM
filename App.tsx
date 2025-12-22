@@ -11,29 +11,45 @@ import { PrivacyPolicy, TermsOfService } from './components/Legal';
 import { Contact } from './components/Contact';
 import { StatusPage } from './components/StatusPage';
 import { AdminPanel } from './components/AdminPanel';
+import { ApiDocs } from './components/ApiDocs';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<PageType | 'admin'>('home');
+  const [currentPage, setCurrentPage] = useState<PageType | 'admin' | 'docs'>('home');
 
   useEffect(() => {
-    // Check initial URL for /admin
+    // 1. Check for Admin Route first
     if (window.location.pathname === '/admin') {
         setCurrentPage('admin');
         return;
     }
 
-    const handlePopState = (event: PopStateEvent) => {
-      if (event.state?.page) setCurrentPage(event.state.page);
-      else setCurrentPage('home');
+    // 2. Check Hash for State Persistence on Reload
+    const hash = window.location.hash.replace('#', '');
+    const validPages: string[] = ['dashboard', 'numbers', 'feed', 'status', 'about', 'contact', 'terms', 'privacy', 'docs'];
+    
+    if (hash && validPages.includes(hash)) {
+        setCurrentPage(hash as any);
+    }
+
+    // 3. Handle Browser Back/Forward Buttons
+    const handlePopState = () => {
+       const newHash = window.location.hash.replace('#', '');
+       if (newHash && validPages.includes(newHash)) {
+           setCurrentPage(newHash as any);
+       } else {
+           setCurrentPage('home');
+       }
     };
+
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigate = (page: PageType) => {
+  const navigate = (page: PageType | 'docs') => {
     setCurrentPage(page);
-    window.history.pushState({ page }, '', page === 'home' ? '/' : `#${page}`);
+    // Update URL hash without reloading
+    window.location.hash = page === 'home' ? '' : page;
     window.scrollTo(0, 0);
   };
 
@@ -43,8 +59,8 @@ function App() {
   }
 
   // Determine Layout
-  // Added 'status' here so it uses the App Layout (Sidebar/BottomNav) instead of Website Layout
-  const isAppLayout = ['dashboard', 'numbers', 'feed', 'status'].includes(currentPage);
+  // Added 'status' and 'docs' here so it uses the App Layout
+  const isAppLayout = ['dashboard', 'numbers', 'feed', 'status', 'docs'].includes(currentPage);
 
   if (isAppLayout) {
       return (
@@ -52,16 +68,17 @@ function App() {
             <Toaster position="top-right" />
             
             {/* Desktop Sidebar */}
-            <Sidebar currentPage={currentPage as PageType} onNavigate={navigate} />
+            <Sidebar currentPage={currentPage as any} onNavigate={navigate} />
             
             {/* Mobile Bottom Navigation */}
-            <BottomNav currentPage={currentPage as PageType} onNavigate={navigate} />
+            <BottomNav currentPage={currentPage as any} onNavigate={navigate} />
 
             <main className="flex-1 lg:ml-72 pb-24 lg:pb-0 transition-all duration-300">
                 {currentPage === 'dashboard' && <Dashboard onNavigate={navigate} />}
                 {currentPage === 'numbers' && <NumbersPage onNavigate={navigate} />}
                 {currentPage === 'feed' && <LiveFeed />}
                 {currentPage === 'status' && <StatusPage />}
+                {currentPage === 'docs' && <ApiDocs />}
             </main>
         </div>
       );
@@ -92,6 +109,7 @@ function App() {
                     <ul className="space-y-3 text-sm text-slate-500">
                         <li><button onClick={() => navigate('numbers')} className="hover:text-indigo-600 transition-colors text-left">Numbers</button></li>
                         <li><button onClick={() => navigate('feed')} className="hover:text-indigo-600 transition-colors text-left">Live Feed</button></li>
+                        <li><button onClick={() => navigate('docs')} className="hover:text-indigo-600 transition-colors text-left">API</button></li>
                     </ul>
                 </div>
                 <div>

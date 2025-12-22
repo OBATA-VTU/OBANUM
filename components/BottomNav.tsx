@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Phone, Radio, Activity } from 'lucide-react';
+import { LayoutDashboard, Phone, Radio, Activity, Code2 } from 'lucide-react';
 import { PageType } from './Navbar';
 
 interface BottomNavProps {
@@ -12,7 +12,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentPage, onNavigate })
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'numbers', label: 'Numbers', icon: Phone },
     { id: 'feed', label: 'Feed', icon: Radio },
-    { id: 'status', label: 'Status', icon: Activity },
+    { id: 'docs', label: 'API', icon: Code2 },
   ];
 
   return (

@@ -2,7 +2,7 @@ import React from 'react';
 import { Menu, X, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
-export type PageType = 'home' | 'dashboard' | 'numbers' | 'feed' | 'about' | 'terms' | 'privacy' | 'status' | 'contact';
+export type PageType = 'home' | 'dashboard' | 'numbers' | 'feed' | 'about' | 'terms' | 'privacy' | 'status' | 'contact' | 'docs';
 
 interface NavbarProps {
   onNavigate: (page: PageType) => void;
@@ -27,11 +27,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
               onClick={() => nav('home')}
               className="flex-shrink-0 flex items-center gap-2 group cursor-pointer outline-none"
             >
-               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-indigo-600">
-                    <path d="M12 2L21 6.9V17L12 22L3 17V6.9L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12 12M9 12A3 3 0 1 0 15 12A3 3 0 1 0 9 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-indigo-600 drop-shadow-sm">
+                    <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" fill="currentColor" stroke="none" />
+                    <path d="M12 18.5V12M12 12V5.5M12 12L17.5 15M12 12L6.5 15" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                </svg>
-              <span className="font-bold text-xl tracking-tight text-slate-900">
+              <span className="font-extrabold text-xl tracking-tight text-slate-900">
                 Obanum
               </span>
             </button>
@@ -44,8 +44,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
               <button onClick={() => nav('about')} className={`px-3 py-2 text-sm font-medium transition-colors ${currentPage === 'about' ? 'text-indigo-600' : 'text-slate-500 hover:text-indigo-600'}`}>
                 About
               </button>
-              <button onClick={() => nav('contact')} className={`px-3 py-2 text-sm font-medium transition-colors ${currentPage === 'contact' ? 'text-indigo-600' : 'text-slate-500 hover:text-indigo-600'}`}>
-                Contact
+              <button onClick={() => nav('docs')} className={`px-3 py-2 text-sm font-medium transition-colors ${currentPage === 'docs' ? 'text-indigo-600' : 'text-slate-500 hover:text-indigo-600'}`}>
+                API
               </button>
             </div>
           </div>
@@ -82,7 +82,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
         <div className="md:hidden bg-white border-b border-slate-100 px-4 py-4 space-y-3 shadow-xl">
             <button onClick={() => nav('home')} className="block w-full text-left px-4 py-3 rounded-xl bg-slate-50 text-slate-900 font-medium">Home</button>
             <button onClick={() => nav('about')} className="block w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-600 font-medium">About</button>
-            <button onClick={() => nav('contact')} className="block w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-600 font-medium">Contact</button>
+            <button onClick={() => nav('docs')} className="block w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-600 font-medium">API</button>
             <button onClick={() => nav('dashboard')} className="block w-full text-left px-4 py-3 rounded-xl bg-indigo-600 text-white font-medium shadow-md">Dashboard</button>
         </div>
       )}
