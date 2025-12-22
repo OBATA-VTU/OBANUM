@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Key, Terminal, Save, Activity, CheckCircle2, AlertTriangle, Users, Lock, Server, Zap, Globe } from 'lucide-react';
+import { Shield, Key, Terminal, Save, Activity, CheckCircle2, AlertTriangle, Users, Lock, Server, Zap, Globe, Heart, X } from 'lucide-react';
 import { API_KEY } from '../constants';
 import { getHealth, getStats } from '../services/talkDrove';
 
@@ -9,31 +9,70 @@ export const AdminPanel: React.FC = () => {
     const [customKey, setCustomKey] = useState('');
     const [logs, setLogs] = useState<string[]>([]);
     
+    // Recovery Modal State
+    const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+    const [favoriteClub, setFavoriteClub] = useState('');
+    const [crushName, setCrushName] = useState('');
+    const [recoveryError, setRecoveryError] = useState('');
+    const [recoverySuccess, setRecoverySuccess] = useState(false);
+    
     // Test States
     const [testingConnection, setTestingConnection] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'failed'>('idle');
     const [latency, setLatency] = useState<number | null>(null);
     
+    const ADMIN_PASSWORD = 'OBA_AAUA';
+
     useEffect(() => {
         const storedKey = localStorage.getItem('OBANUM_CUSTOM_API_KEY');
         if (storedKey) setCustomKey(storedKey);
     }, []);
 
+    const addLog = (msg: string) => {
+        setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
+    };
+
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        // UPDATED PASSWORD LOGIC
-        if (password === 'OBA_AAUA') {
+        if (password === ADMIN_PASSWORD) {
             setIsAuthenticated(true);
             addLog("System access granted. User: Administrator");
-            addLog("Protocol: Secure Shell Initialized");
         } else {
             alert('Access Denied. Incident Reported.');
             addLog("Failed login attempt detected.");
         }
     };
 
-    const addLog = (msg: string) => {
-        setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
+    const handleRecoverySubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setRecoveryError('');
+    
+        const clubMatch = favoriteClub.trim().toLowerCase() === 'manchester city';
+        const crushMatch = crushName.trim().toLowerCase() === 'rachael iheonu';
+    
+        if (clubMatch && crushMatch) {
+            setRecoverySuccess(true);
+            addLog("Passcode recovery successful via security questions.");
+            setTimeout(() => {
+                setIsAuthenticated(true);
+                setIsForgotModalOpen(false); // Close modal on login
+                // Reset state for next time
+                setRecoverySuccess(false);
+                setFavoriteClub('');
+                setCrushName('');
+            }, 4000); // 4-second delay before auto-login
+        } else {
+            setRecoveryError('Incorrect answers. Access denied.');
+            addLog("Failed passcode recovery attempt.");
+        }
+    };
+
+    const openRecoveryModal = () => {
+        setRecoveryError('');
+        setRecoverySuccess(false);
+        setFavoriteClub('');
+        setCrushName('');
+        setIsForgotModalOpen(true);
     };
 
     const saveKey = () => {
@@ -51,7 +90,6 @@ export const AdminPanel: React.FC = () => {
         const start = performance.now();
         
         try {
-            // Actually call the API to verify the key works
             const stats = await getStats();
             const end = performance.now();
             setLatency(Math.round(end - start));
@@ -82,33 +120,96 @@ export const AdminPanel: React.FC = () => {
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center p-4 font-mono">
-                <form onSubmit={handleLogin} className="bg-zinc-900 p-8 rounded-none border border-zinc-800 shadow-2xl max-w-md w-full relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-red-600"></div>
-                    <div className="flex justify-center mb-6">
-                        <div className="w-16 h-16 bg-red-900/20 rounded-full flex items-center justify-center text-red-500 border border-red-900/50">
-                            <Lock className="w-8 h-8" />
+                <div className="max-w-md w-full">
+                    <form onSubmit={handleLogin} className="bg-zinc-900 p-8 border border-zinc-800 shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-red-600"></div>
+                        <div className="flex justify-center mb-6">
+                            <div className="w-16 h-16 bg-red-900/20 rounded-full flex items-center justify-center text-red-500 border border-red-900/50">
+                                <Lock className="w-8 h-8" />
+                            </div>
+                        </div>
+                        <h1 className="text-xl font-bold text-white text-center mb-2 uppercase tracking-widest">Restricted Access</h1>
+                        <p className="text-zinc-500 text-center mb-8 text-xs">Obanum Secure Gateway • Authorization Required</p>
+                        
+                        <div className="relative mb-6">
+                            <input 
+                                type="password" 
+                                placeholder="ENTER PASSCODE"
+                                className="w-full bg-black border border-zinc-700 text-white px-4 py-4 focus:border-red-600 outline-none tracking-widest text-center"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                            />
+                        </div>
+                        <button type="submit" className="w-full bg-white hover:bg-zinc-200 text-black font-bold py-4 uppercase tracking-widest transition-colors">
+                            Authenticate
+                        </button>
+                        <div className="text-center mt-6">
+                            <button onClick={openRecoveryModal} type="button" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+                                Forgot Passcode?
+                            </button>
+                        </div>
+                        <div className="mt-6 flex justify-between text-[10px] text-zinc-600 uppercase">
+                            <span>ID: {Math.random().toString(36).substring(7).toUpperCase()}</span>
+                            <span>Encrypted: TLS 1.3</span>
+                        </div>
+                    </form>
+                </div>
+
+                {isForgotModalOpen && (
+                    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-mono animate-fade-in-up">
+                        <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md relative shadow-2xl p-8">
+                            <button onClick={() => setIsForgotModalOpen(false)} className="absolute top-4 right-4 text-zinc-600 hover:text-white transition-colors">
+                                <X className="w-6 h-6" />
+                            </button>
+                            
+                            {recoverySuccess ? (
+                                <div className="text-center">
+                                    <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4 animate-pulse" />
+                                    <h2 className="text-lg font-bold text-white mb-2 uppercase tracking-widest">Authentication Successful</h2>
+                                    <p className="text-zinc-400 text-sm mb-4">Your access credentials have been verified.</p>
+                                    <div className="bg-black border border-zinc-800 p-4 my-4">
+                                        <div className="text-xs text-zinc-500 uppercase">Passcode</div>
+                                        <p className="text-2xl text-green-400 tracking-widest font-bold">{ADMIN_PASSWORD}</p>
+                                    </div>
+                                    <p className="text-xs text-zinc-500 animate-pulse">Redirecting to Command Center...</p>
+                                </div>
+                            ) : (
+                                <form onSubmit={handleRecoverySubmit}>
+                                    <h2 className="text-lg font-bold text-white text-center mb-2 uppercase tracking-widest">Passcode Recovery</h2>
+                                    <p className="text-zinc-500 text-center text-xs mb-8">Answer the security questions to proceed.</p>
+                                    
+                                    <div className="mb-6">
+                                        <label className="block text-zinc-400 text-xs mb-2">What is your favorite club?</label>
+                                        <input 
+                                            type="text"
+                                            value={favoriteClub}
+                                            onChange={e => setFavoriteClub(e.target.value)}
+                                            required
+                                            className="w-full bg-black border border-zinc-700 text-white px-3 py-3 focus:border-indigo-500 outline-none"
+                                        />
+                                    </div>
+
+                                    <div className="mb-6">
+                                        <label className="block text-zinc-400 text-xs mb-2 flex items-center gap-2">What is your crush's name? <Heart className="w-3 h-3 text-red-500" /></label>
+                                        <input 
+                                            type="text"
+                                            value={crushName}
+                                            onChange={e => setCrushName(e.target.value)}
+                                            required
+                                            className="w-full bg-black border border-zinc-700 text-white px-3 py-3 focus:border-indigo-500 outline-none"
+                                        />
+                                    </div>
+
+                                    {recoveryError && <p className="text-red-500 text-xs text-center mb-4 bg-red-900/20 border border-red-900/50 p-3">{recoveryError}</p>}
+                                    
+                                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 uppercase tracking-widest transition-colors">
+                                        Verify Identity
+                                    </button>
+                                </form>
+                            )}
                         </div>
                     </div>
-                    <h1 className="text-xl font-bold text-white text-center mb-2 uppercase tracking-widest">Restricted Access</h1>
-                    <p className="text-zinc-500 text-center mb-8 text-xs">Obanum Secure Gateway • Authorization Required</p>
-                    
-                    <div className="relative mb-6">
-                        <input 
-                            type="password" 
-                            placeholder="ENTER PASSCODE"
-                            className="w-full bg-black border border-zinc-700 text-white px-4 py-4 focus:border-red-600 outline-none tracking-widest text-center"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                        />
-                    </div>
-                    <button type="submit" className="w-full bg-white hover:bg-zinc-200 text-black font-bold py-4 uppercase tracking-widest transition-colors">
-                        Authenticate
-                    </button>
-                    <div className="mt-6 flex justify-between text-[10px] text-zinc-600 uppercase">
-                        <span>ID: {Math.random().toString(36).substring(7).toUpperCase()}</span>
-                        <span>Encrypted: TLS 1.3</span>
-                    </div>
-                </form>
+                )}
             </div>
         );
     }

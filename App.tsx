@@ -13,6 +13,7 @@ import { StatusPage } from './components/StatusPage';
 import { AdminPanel } from './components/AdminPanel';
 import { ApiDocs } from './components/ApiDocs';
 import { OplugAd } from './components/OplugAd';
+import { OplugModalAd } from './components/OplugModalAd';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -82,8 +83,9 @@ function App() {
                 {currentPage === 'docs' && <ApiDocs />}
             </main>
 
-            {/* Oplug Ad Component - Renders on top of the app layout */}
+            {/* Ad Components - Renders on top of the app layout */}
             <OplugAd />
+            <OplugModalAd />
         </div>
       );
   }
